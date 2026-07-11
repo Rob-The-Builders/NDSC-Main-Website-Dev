@@ -122,6 +122,8 @@ export interface ScienceMediaRow {
 }
 
 // ── homepage_settings (key-value store) ────────────────────────────────
+// Also holds Appearance settings (Admin > Appearance): default_theme,
+// font_family, header_size — same generic key/value shape, no separate table.
 export interface HomepageSettingRow {
   key: string
   value: string
