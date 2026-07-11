@@ -1,17 +1,22 @@
 import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { authCookies } from '@/lib/config/site'
+import {
+  LayoutDashboard, Users, CalendarDays, BookOpen, UserCog,
+  Megaphone, Trophy, Film, Settings, Power, ClipboardList,
+} from 'lucide-react'
 
 const NAV_LINKS = [
-  { href: '/admin', label: 'Dashboard', icon: '🏠' },
-  { href: '/admin/members', label: 'Members', icon: '👥' },
-  { href: '/admin/activities', label: 'Activities', icon: '📅' },
-  { href: '/admin/publications', label: 'Publications', icon: '📚' },
-  { href: '/admin/executives', label: 'Executives', icon: '👥' },
-  { href: '/admin/announcements', label: 'Announcements', icon: '📢' },
-  { href: '/admin/olympiads', label: 'Olympiads', icon: '🏆' },
-  { href: '/admin/science-media', label: 'Science Media', icon: '🎬' },
-  { href: '/admin/homepage-settings', label: 'Homepage Settings', icon: '⚙️' },
+  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/members', label: 'Members', icon: Users },
+  { href: '/admin/activities', label: 'Activities', icon: CalendarDays },
+  { href: '/admin/publications', label: 'Publications', icon: BookOpen },
+  { href: '/admin/executives', label: 'Executives', icon: UserCog },
+  { href: '/admin/announcements', label: 'Announcements', icon: Megaphone },
+  { href: '/admin/olympiads', label: 'Olympiads', icon: Trophy },
+  { href: '/admin/surveys', label: 'Surveys', icon: ClipboardList },
+  { href: '/admin/science-media', label: 'Science Media', icon: Film },
+  { href: '/admin/homepage-settings', label: 'Homepage Settings', icon: Settings },
 ]
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -44,7 +49,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors hover:text-white"
               style={{ color: 'var(--muted)' }}
             >
-              <span>{link.icon}</span>
+              <link.icon size={17} />
               <span>{link.label}</span>
             </Link>
           ))}
@@ -56,7 +61,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             className="flex items-center gap-2 text-xs transition-colors hover:text-red-400"
             style={{ color: 'var(--muted)' }}
           >
-            <span>⏻</span> Logout
+            <Power size={15} /> Logout
           </a>
         </div>
       </aside>

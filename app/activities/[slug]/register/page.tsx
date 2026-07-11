@@ -2,7 +2,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronRight, ArrowLeft, Upload, Users, Plus, X } from 'lucide-react'
+import { ChevronRight, ArrowLeft, Upload, Users, Plus, X, CalendarDays, CheckCircle, CreditCard, Link2, Phone, Mail, MessageCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 const uid = () => Math.random().toString(36).slice(2, 9)
@@ -64,7 +64,9 @@ function ActivityRegisterPageInner() {
   // Form fields
   const [form, setForm] = useState(BLANK_FORM)
   const [projectName, setProjectName] = useState('')
-  const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({})
+  const [customAnswers, setCustomAnswers] = useState<Record<string, any>>({})
+  const [otherActive, setOtherActive] = useState<Record<string, boolean>>({})
+  const [uploadingFields, setUploadingFields] = useState<Record<string, boolean>>({})
   const [teamMembers, setTeamMembers] = useState<any[]>([])
   const [submitting, setSubmitting] = useState(false)
 
@@ -222,16 +224,36 @@ function ActivityRegisterPageInner() {
       xhr.send(fd)
     })
 
-  const handleCustomFileField = async (key: string, file: File | null, maxSizeMb?: number) => {
-    if (!file) return
-    if (maxSizeMb && file.size > maxSizeMb * 1024 * 1024) {
-      setError(`File too large — max ${maxSizeMb}MB allowed for this field.`)
+  const handleCustomFileField = async (key: string, fileList: FileList | null, field: any) => {
+    if (!fileList || fileList.length === 0) return
+    const files = Array.from(fileList)
+    const maxFiles = field.max_files && field.max_files > 1 ? field.max_files : 1
+    const maxSizeMb = field.max_file_size_mb
+    const existing: string[] = maxFiles > 1 && Array.isArray(customAnswers[key]) ? customAnswers[key] : []
+    if (existing.length + files.length > maxFiles) {
+      setError(`You can upload at most ${maxFiles} file${maxFiles > 1 ? 's' : ''} for "${field.label}".`)
       return
     }
-    try { setCustomAnswers(prev => ({ ...prev, [key]: 'uploading...' }))
-      const url = await uploadFieldFile(file)
-      setCustomAnswers(prev => ({ ...prev, [key]: url }))
+    for (const file of files) {
+      if (maxSizeMb && file.size > maxSizeMb * 1024 * 1024) {
+        setError(`File too large — max ${maxSizeMb}MB allowed for this field.`)
+        return
+      }
+    }
+    setUploadingFields(p => ({ ...p, [key]: true }))
+    try {
+      const urls = await Promise.all(files.map(f => uploadFieldFile(f)))
+      setCustomAnswers(prev => ({ ...prev, [key]: maxFiles > 1 ? [...existing, ...urls] : urls[0] }))
     } catch (e: any) { setError(e.message || 'Upload failed.') }
+    finally { setUploadingFields(p => ({ ...p, [key]: false })) }
+  }
+
+  const removeCustomFile = (key: string, idx: number) => {
+    setCustomAnswers(prev => {
+      const arr = Array.isArray(prev[key]) ? [...prev[key]] : []
+      arr.splice(idx, 1)
+      return { ...prev, [key]: arr }
+    })
   }
 
   const handleTeamFileField = async (memberIdx: number, key: string, file: File | null) => {
@@ -333,7 +355,7 @@ function ActivityRegisterPageInner() {
   const isLongDesc = sessionDesc.length > 220
 
   return (
-    <div className="min-h-screen py-12 px-4" style={{ background: 'var(--bg)', paddingTop: '88px' }}>
+    <div className="min-h-screen py-12 px-4" style={{ background: sessionInfo?.bg_color || 'var(--bg)', paddingTop: '88px' }}>
       <div className="max-w-lg mx-auto">
         <Link href={`/activities/${slug}`} className="inline-flex items-center gap-2 text-sm mb-6" style={{ color: 'var(--muted)' }}>
           <ArrowLeft size={14} /> Back to activity
@@ -439,16 +461,16 @@ function ActivityRegisterPageInner() {
             </button>
 
             {currentLeaf.schedule_date && (
-              <div className="p-3 rounded-lg text-sm" style={{ background: 'rgba(var(--cat-teal-rgb), 0.08)', color: 'var(--cat-teal)' }}>
-                📅 {new Date(currentLeaf.schedule_date).toLocaleDateString('en-BD', { month: 'short', day: 'numeric' })}
+              <div className="p-3 rounded-lg text-sm flex items-center gap-1.5" style={{ background: 'rgba(var(--cat-teal-rgb), 0.08)', color: 'var(--cat-teal)' }}>
+                <CalendarDays size={14} /> {new Date(currentLeaf.schedule_date).toLocaleDateString('en-BD', { month: 'short', day: 'numeric' })}
                 {currentLeaf.schedule_time && ` — ${currentLeaf.schedule_time}`}
                 {currentLeaf.schedule_room && ` — ${currentLeaf.schedule_room}`}
               </div>
             )}
 
             {knownInfo && (
-              <div className="px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(var(--blue-rgb), 0.06)', color: 'var(--blue)', border: '1px solid rgba(var(--blue-rgb), 0.2)' }}>
-                ✓ We've pre-filled your info from a previous registration — update anything that's changed.
+              <div className="px-3 py-2 rounded-lg text-xs flex items-start gap-1.5" style={{ background: 'rgba(var(--blue-rgb), 0.06)', color: 'var(--blue)', border: '1px solid rgba(var(--blue-rgb), 0.2)' }}>
+                <CheckCircle size={13} className="shrink-0 mt-0.5" /> <span>We've pre-filled your info from a previous registration — update anything that's changed.</span>
               </div>
             )}
 
@@ -528,19 +550,58 @@ function ActivityRegisterPageInner() {
                         onChange={e => setCustomAnswers(p => ({ ...p, [field.key]: e.target.value }))}
                         className={inputCls + ' resize-none'} style={inputStyle} />
                     ) : field.type === 'dropdown' ? (
-                      <select value={customAnswers[field.key] || ''} onChange={e => setCustomAnswers(p => ({ ...p, [field.key]: e.target.value }))}
-                        className={inputCls} style={inputStyle}>
-                        <option value="">Select...</option>
-                        {(field.options || []).map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
-                      </select>
-                    ) : field.type === 'photo' || field.type === 'file' ? (
-                      <label className="flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer text-sm" style={{ ...inputStyle, color: accent }}>
-                        <Upload size={14} />
-                        {customAnswers[field.key] && customAnswers[field.key] !== 'uploading...' ? `${field.label} uploaded ✓` : customAnswers[field.key] === 'uploading...' ? 'Uploading…' : `Upload ${field.label}${field.max_file_size_mb ? ` (max ${field.max_file_size_mb}MB)` : ''}`}
-                        <input type="file" accept={field.type === 'photo' ? 'image/*' : undefined} className="hidden"
-                          onChange={e => handleCustomFileField(field.key, e.target.files?.[0] || null, field.max_file_size_mb)} />
-                      </label>
-                    ) : (
+                      <div>
+                        <select
+                          value={otherActive[field.key] ? '__other__' : (customAnswers[field.key] || '')}
+                          onChange={e => {
+                            if (e.target.value === '__other__') {
+                              setOtherActive(p => ({ ...p, [field.key]: true }))
+                              setCustomAnswers(p => ({ ...p, [field.key]: '' }))
+                            } else {
+                              setOtherActive(p => ({ ...p, [field.key]: false }))
+                              setCustomAnswers(p => ({ ...p, [field.key]: e.target.value }))
+                            }
+                          }}
+                          className={inputCls} style={inputStyle}>
+                          <option value="">Select...</option>
+                          {(field.options || []).map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
+                          {field.allow_other && <option value="__other__">Other…</option>}
+                        </select>
+                        {field.allow_other && otherActive[field.key] && (
+                          <input placeholder="Please specify" value={customAnswers[field.key] || ''}
+                            onChange={e => setCustomAnswers(p => ({ ...p, [field.key]: e.target.value }))}
+                            className={inputCls + ' mt-2'} style={inputStyle} />
+                        )}
+                      </div>
+                    ) : field.type === 'photo' || field.type === 'file' ? (() => {
+                      const maxFiles = field.max_files && field.max_files > 1 ? field.max_files : 1
+                      const val = customAnswers[field.key]
+                      const urls: string[] = Array.isArray(val) ? val : (val ? [val] : [])
+                      const isUploading = !!uploadingFields[field.key]
+                      const atCap = urls.length >= maxFiles
+                      return (
+                        <div className="space-y-2">
+                          {urls.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                              {urls.map((u, i) => (
+                                <span key={i} className="flex items-center gap-1 px-2 py-1 rounded text-xs" style={{ background: 'var(--bg2)', color: accent }}>
+                                  {field.label}{maxFiles > 1 ? ` #${i + 1}` : ''} <CheckCircle size={11} />
+                                  <button type="button" onClick={() => removeCustomFile(field.key, i)}><X size={11} /></button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          {!atCap && (
+                            <label className="flex items-center gap-2 px-3 py-2.5 rounded-lg border cursor-pointer text-sm" style={{ ...inputStyle, color: accent }}>
+                              <Upload size={14} />
+                              {isUploading ? 'Uploading…' : `Upload ${field.label}${field.max_file_size_mb ? ` (max ${field.max_file_size_mb}MB${maxFiles > 1 ? ` each, up to ${maxFiles} files` : ''})` : maxFiles > 1 ? ` (up to ${maxFiles} files)` : ''}`}
+                              <input type="file" multiple={maxFiles > 1} accept={field.type === 'photo' ? 'image/*' : undefined} className="hidden"
+                                onChange={e => { handleCustomFileField(field.key, e.target.files, field); e.target.value = '' }} />
+                            </label>
+                          )}
+                        </div>
+                      )
+                    })() : (
                       <input type={field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : field.type === 'time' ? 'time' : 'text'}
                         value={customAnswers[field.key] || ''}
                         onChange={e => setCustomAnswers(p => ({ ...p, [field.key]: e.target.value }))}
@@ -596,7 +657,7 @@ function ActivityRegisterPageInner() {
                         <div key={field.key}>
                           {field.type === 'photo' ? (
                             <label className="flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer text-xs" style={{ ...inputStyle, color: 'var(--blue)' }}>
-                              <Upload size={12} /> {m.custom_answers?.[field.key] ? `${field.label} ✓` : field.label}
+                              <Upload size={12} /> {m.custom_answers?.[field.key] ? <>{field.label} <CheckCircle size={11} /></> : field.label}
                               <input type="file" accept="image/*" className="hidden" onChange={e => handleTeamFileField(idx, field.key, e.target.files?.[0] || null)} />
                             </label>
                           ) : (
@@ -620,14 +681,14 @@ function ActivityRegisterPageInner() {
             )}
 
             {currentLeaf.requires_payment && (
-              <div className="p-3 rounded-lg text-sm" style={{ background: 'rgba(var(--warning-rgb), 0.08)', color: 'var(--warning)' }}>
-                💳 {currentLeaf.payment_label || 'Registration fee'}: ৳{currentLeaf.payment_amount} — you'll be redirected to pay after submitting.
+              <div className="p-3 rounded-lg text-sm flex items-center gap-1.5" style={{ background: 'rgba(var(--warning-rgb), 0.08)', color: 'var(--warning)' }}>
+                <CreditCard size={14} /> {currentLeaf.payment_label || 'Registration fee'}: ৳{currentLeaf.payment_amount} — you'll be redirected to pay after submitting.
               </div>
             )}
 
             {currentLeaf.is_online_submission && (
-              <div className="p-3 rounded-lg text-sm" style={{ background: 'rgba(var(--blue-rgb), 0.06)', color: 'var(--blue)', border: '1px solid rgba(var(--blue-rgb), 0.2)' }}>
-                🔗 This category includes an online round. You'll find the exam / submission link in your dashboard after registering.
+              <div className="p-3 rounded-lg text-sm flex items-start gap-1.5" style={{ background: 'rgba(var(--blue-rgb), 0.06)', color: 'var(--blue)', border: '1px solid rgba(var(--blue-rgb), 0.2)' }}>
+                <Link2 size={14} className="shrink-0 mt-0.5" /> <span>This category includes an online round. You'll find the exam / submission link in your dashboard after registering.</span>
               </div>
             )}
 
@@ -645,9 +706,9 @@ function ActivityRegisterPageInner() {
                   {contactPersons.map((cp: any, i: number) => (
                     <div key={i} className="text-xs space-y-0.5" style={{ color: 'var(--muted)' }}>
                       <p className="font-medium" style={{ color: 'var(--white)' }}>{cp.name} {cp.post && `— ${cp.post}`}</p>
-                      {cp.phone && <p>📞 {cp.phone}</p>}
-                      {cp.email && <p>✉️ {cp.email}</p>}
-                      {cp.whatsapp && <a href={`https://wa.me/${cp.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="block" style={{ color: 'var(--cat-teal)' }}>💬 WhatsApp</a>}
+                      {cp.phone && <p className="flex items-center gap-1"><Phone size={11} /> {cp.phone}</p>}
+                      {cp.email && <p className="flex items-center gap-1"><Mail size={11} /> {cp.email}</p>}
+                      {cp.whatsapp && <a href={`https://wa.me/${cp.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1" style={{ color: 'var(--cat-teal)' }}><MessageCircle size={11} /> WhatsApp</a>}
                       {cp.facebook && <a href={cp.facebook} target="_blank" rel="noopener noreferrer" className="block" style={{ color: 'var(--blue)' }}>Facebook →</a>}
                     </div>
                   ))}

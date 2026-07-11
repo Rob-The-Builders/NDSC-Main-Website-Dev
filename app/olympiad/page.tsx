@@ -1,11 +1,17 @@
 'use client'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Clock, ChevronRight, ChevronLeft, Upload, CheckCircle, AlertCircle, Camera } from 'lucide-react'
+import { Clock, ChevronRight, ChevronLeft, Upload, CheckCircle, AlertCircle, Camera, Image as ImageIcon, X } from 'lucide-react'
+import MathText from '@/components/olympiad/MathText'
+import MathInputField from '@/components/olympiad/MathInputField'
 
-type QuestionType = 'mcq' | 'short' | 'photo'
+type QuestionType = 'mcq' | 'checkbox' | 'short' | 'photo'
 type McqOption = { id: string; text: string }
-type Question = { id: string; type: QuestionType; text: string; description?: string; options?: McqOption[]; correct_option_id?: string; marks?: number; subject_id?: string }
+type Question = {
+  id: string; type: QuestionType; text: string; description?: string; image_url?: string
+  options?: McqOption[]; correct_option_id?: string; correct_option_ids?: string[]
+  required?: boolean; marks?: number; subject_id?: string
+}
 type RegField = { key: string; label: string; type: string; required: boolean }
 type Olympiad = {
   id: string; name: string; description: string; cover_image_url?: string; pdf_url?: string
@@ -15,10 +21,32 @@ type Olympiad = {
   registration_deadline?: string; exam_date?: string
   eligibility?: string; external_only?: boolean; registration_fields: RegField[]; questions: Question[]
   scheduled_start_at?: string | null; scheduled_end_at?: string | null
+  // Per-olympiad appearance, set in Admin → Olympiads → Appearance. All optional —
+  // anything left blank just falls back to the site's normal look.
+  theme_bg_color?: string | null
+  theme_bg_image_url?: string | null
+  theme_accent_color?: string | null
+  theme_header_title?: string | null
+  theme_header_subtitle?: string | null
+  theme_header_logo_url?: string | null
 }
 
 type Phase = 'list' | 'register' | 'dashboard' | 'exam' | 'done' | 'result'
 const MAX_PHOTO_MB = 15
+
+// Lightweight shape returned by /api/olympiad?listing=1 — a standalone
+// olympiad (i.e. not routed through the Activity registration system) that
+// may or may not currently be open to the visitor. Used purely to decide
+// whether to show a card as registrable or greyed-out at the bottom.
+type OlympiadListing = {
+  id: string; name: string; description?: string; cover_image_url?: string
+  is_active: boolean; registration_deadline?: string; exam_date?: string
+  scheduled_start_at?: string | null; scheduled_end_at?: string | null
+  eligibility?: string; external_only?: boolean
+  theme_bg_color?: string | null; theme_accent_color?: string | null; theme_header_logo_url?: string | null
+}
+type ListingStatus = 'open' | 'inactive' | 'closed' | 'ineligible'
+const PROFILE_KEY = 'ndsc_olympiad_profile'
 
 export default function OlympiadPage() {
   const router = useRouter()
@@ -31,6 +59,12 @@ export default function OlympiadPage() {
   // links, or a direct `?id=` link) can still resume and finish here.
   const [onlineCards, setOnlineCards] = useState<any[]>([])
   const [cardsLoading, setCardsLoading] = useState(true)
+  // Standalone olympiads (created directly in Admin → Olympiads, never linked
+  // to an Activity category) — shown alongside onlineCards, but greyed out
+  // and sorted to the bottom when they're inactive, out of their time window,
+  // or don't match what we know about the visitor's eligibility.
+  const [standaloneListing, setStandaloneListing] = useState<OlympiadListing[]>([])
+  const [standaloneLoading, setStandaloneLoading] = useState(true)
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Olympiad | null>(null)
   const [phase, setPhase] = useState<Phase>('list')
@@ -41,7 +75,7 @@ export default function OlympiadPage() {
   const [regData, setRegData] = useState<any>(null)
 
   // Exam state
-  const [mcqAnswers, setMcqAnswers] = useState<Record<string, string>>({})
+  const [mcqAnswers, setMcqAnswers] = useState<Record<string, string | string[]>>({})
   const [shortAnswers, setShortAnswers] = useState<Record<string, string>>({})
   const [photoFiles, setPhotoFiles] = useState<Record<string, File>>({})
   const [photoUploading, setPhotoUploading] = useState<Record<string, number>>({})
@@ -79,6 +113,7 @@ export default function OlympiadPage() {
   useEffect(() => {
     fetch('/api/olympiad').then(r => r.json()).then(d => { setOlympiads(Array.isArray(d) ? d : []) }).catch(() => {}).finally(() => setLoading(false))
     fetch('/api/activity-online-categories-public').then(r => r.json()).then(d => { setOnlineCards(Array.isArray(d) ? d : []) }).catch(() => {}).finally(() => setCardsLoading(false))
+    fetch('/api/olympiad?listing=1').then(r => r.json()).then(d => { setStandaloneListing(Array.isArray(d) ? d : []) }).catch(() => {}).finally(() => setStandaloneLoading(false))
 
     // Resume a previous session if we have a registration id saved — check
     // the URL first (so a shared/bookmarked link works), then localStorage.
@@ -140,6 +175,12 @@ export default function OlympiadPage() {
             for (const q of olympiad.questions.filter((q: any) => q.type === 'mcq')) {
               if ((registration.mcq_answers || {})[q.id] === q.correct_option_id) score += (q.marks || 1)
             }
+            for (const q of olympiad.questions.filter((q: any) => q.type === 'checkbox')) {
+              const chosen: string[] = Array.isArray((registration.mcq_answers || {})[q.id]) ? (registration.mcq_answers || {})[q.id] : []
+              const correct: string[] = q.correct_option_ids || []
+              const isCorrect = chosen.length > 0 && chosen.length === correct.length && chosen.every((id: string) => correct.includes(id))
+              if (isCorrect) score += (q.marks || 1)
+            }
             fetch('/api/olympiad-register', {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
@@ -175,6 +216,61 @@ export default function OlympiadPage() {
 
   const openRegister = (o: Olympiad) => {
     setSelected(o); setPhase('register'); setError(''); setForm({}); setFileError(''); setAnswerSheetFile(null)
+  }
+
+  // We have no login system on this page, so "my criteria" can only mean
+  // what we already know from a previous registration on this browser
+  // (saved right after a successful submission below). If nothing has been
+  // saved yet, we don't have enough to say someone is ineligible, so we
+  // default to letting them through rather than hiding something wrongly.
+  const getProfile = (): { college?: string; hsc_session?: string } => {
+    try { return JSON.parse(localStorage.getItem(PROFILE_KEY) || '{}') } catch { return {} }
+  }
+  const saveProfile = (college?: string, hsc_session?: string) => {
+    try { localStorage.setItem(PROFILE_KEY, JSON.stringify({ college, hsc_session })) } catch { /* ignore */ }
+  }
+
+  // Decide whether a standalone olympiad should be shown as registrable, and
+  // if not, why — so the card can explain itself instead of just vanishing
+  // or looking broken.
+  const getListingStatus = (o: OlympiadListing): { status: ListingStatus; reason: string } => {
+    if (!o.is_active) return { status: 'inactive', reason: 'Not currently active' }
+
+    const now = Date.now()
+    if (o.registration_deadline && now > new Date(o.registration_deadline).getTime()) {
+      return { status: 'closed', reason: `Registration closed ${fmtDate(o.registration_deadline)}` }
+    }
+    if (o.scheduled_end_at && now > new Date(o.scheduled_end_at).getTime()) {
+      return { status: 'closed', reason: 'Exam window has ended' }
+    }
+    if (!o.scheduled_end_at && o.exam_date) {
+      const end = new Date(o.exam_date); end.setHours(23, 59, 59, 999)
+      if (now > end.getTime()) return { status: 'closed', reason: `Exam was on ${fmtDate(o.exam_date)}` }
+    }
+
+    if (o.external_only === false) {
+      const profile = getProfile()
+      if (profile.college && profile.college.trim().toLowerCase() !== 'notre dame college') {
+        return { status: 'ineligible', reason: 'Open to Notre Dame College students only' }
+      }
+    }
+
+    return { status: 'open', reason: '' }
+  }
+
+  // Standalone cards only carry the lightweight listing fields — to actually
+  // register we need the full olympiad (questions, registration_fields,
+  // etc.), which for an active one is already sitting in `olympiads`
+  // (fetched above). Falling back to a direct fetch covers any edge case
+  // where it isn't there yet.
+  const openStandaloneOlympiad = async (id: string) => {
+    const full = olympiads.find(o => o.id === id)
+    if (full) { openRegister(full); return }
+    try {
+      const r = await fetch(`/api/olympiad?id=${id}`)
+      const d = await r.json()
+      if (d?.olympiad) openRegister(d.olympiad)
+    } catch { /* ignore — card stays put */ }
   }
 
   // Timer
@@ -288,6 +384,7 @@ export default function OlympiadPage() {
       const res = await fetch('/api/olympiad-register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Registration failed.')
+      saveProfile(payload.college, payload.hsc_session)
       setRegId(data.id || '')
       setRegData(data)
       setPhase('dashboard')
@@ -329,6 +426,19 @@ export default function OlympiadPage() {
           return {
             question_id: q.id, question_text: q.text, type: q.type,
             student_answer: chosen?.text ?? null, correct_answer: correct?.text ?? null,
+            is_correct: isCorrect, marks_awarded: isCorrect ? (q.marks || 1) : 0, marks_possible: q.marks || 1,
+          }
+        }
+        if (q.type === 'checkbox') {
+          const chosenIds: string[] = Array.isArray(mcqAnswers[q.id]) ? (mcqAnswers[q.id] as string[]) : []
+          const correctIds: string[] = q.correct_option_ids || []
+          const isCorrect = chosenIds.length > 0 && chosenIds.length === correctIds.length && chosenIds.every(id => correctIds.includes(id))
+          if (isCorrect) score += (q.marks || 1)
+          const chosenText = (q.options || []).filter(o => chosenIds.includes(o.id)).map(o => o.text).join(', ')
+          const correctText = (q.options || []).filter(o => correctIds.includes(o.id)).map(o => o.text).join(', ')
+          return {
+            question_id: q.id, question_text: q.text, type: q.type,
+            student_answer: chosenText || null, correct_answer: correctText || null,
             is_correct: isCorrect, marks_awarded: isCorrect ? (q.marks || 1) : 0, marks_possible: q.marks || 1,
           }
         }
@@ -420,6 +530,35 @@ export default function OlympiadPage() {
     return o.questions?.some(q => q.type === 'photo') || !!o.pdf_url
   }
 
+  // Turns an olympiad's admin-configured appearance overrides (background
+  // color/image, accent color, header text/logo) into ready-to-use style
+  // objects for the register/dashboard/exam/done/result pages. Anything not
+  // set by the organizer just falls back to the site's normal look, so this
+  // is always safe to call even for olympiads with no custom theme at all.
+  const getTheme = (o?: Olympiad | null) => {
+    const accent = o?.theme_accent_color || null
+    const pageStyle: React.CSSProperties = o?.theme_bg_image_url
+      ? {
+          backgroundImage: `linear-gradient(${o.theme_bg_color || 'rgba(0,0,0,0.45)'}, ${o.theme_bg_color || 'rgba(0,0,0,0.45)'}), url(${o.theme_bg_image_url})`,
+          backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed',
+        }
+      : { background: o?.theme_bg_color || bg }
+    return {
+      pageStyle,
+      accent,
+      // Drop-in replacement for the site's default blue CTA gradient — pass
+      // this as a button's `style` (spread it) to have primary actions pick
+      // up the olympiad's accent color when one's set.
+      ctaStyle: (accent
+        ? { background: accent, color: '#fff' }
+        : { background: 'linear-gradient(90deg,var(--blue),var(--blue2))', color: '#fff' }) as React.CSSProperties,
+      headerTitle: o?.theme_header_title || o?.name || '',
+      headerSubtitle: o?.theme_header_subtitle || '',
+      headerLogo: o?.theme_header_logo_url || '',
+    }
+  }
+  const theme = getTheme(selected)
+
   // ── RESTORING ────────────────────────────────────────────────────────────────
   if (restoring) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: bg }}>
@@ -428,18 +567,30 @@ export default function OlympiadPage() {
   )
 
   // ── LIST ────────────────────────────────────────────────────────────────────
-  if (phase === 'list') return (
+  if (phase === 'list') {
+    const listLoading = cardsLoading || standaloneLoading
+    const standaloneWithStatus = standaloneListing.map(o => ({ o, ...getListingStatus(o) }))
+    const openStandalone = standaloneWithStatus.filter(s => s.status === 'open')
+    // Greyed-out ones always sink to the very bottom, worst offense last:
+    // temporarily ineligible/closed above permanently inactive.
+    const rank: Record<ListingStatus, number> = { open: 0, ineligible: 1, closed: 2, inactive: 3 }
+    const greyedStandalone = standaloneWithStatus
+      .filter(s => s.status !== 'open')
+      .sort((a, b) => rank[a.status] - rank[b.status])
+    const totalCount = onlineCards.length + standaloneListing.length
+
+    return (
     <div className="min-h-screen py-16 px-4" style={{ background: bg }}>
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
           <h1 className="text-3xl font-bold mb-3" style={{ fontFamily: 'Orbitron, monospace', color: 'var(--blue)' }}>NDSC Olympiads</h1>
           <p style={{ color: 'var(--muted)' }}>Take part in NDSC science olympiads, test your knowledge, and win prizes.</p>
         </div>
-        {cardsLoading && <p className="text-center" style={{ color: 'var(--border-soft)' }}>Loading…</p>}
-        {!cardsLoading && onlineCards.length === 0 && <p className="text-center py-12" style={{ color: 'var(--border-soft)' }}>No online olympiad rounds open right now. Check back soon.</p>}
+        {listLoading && <p className="text-center" style={{ color: 'var(--border-soft)' }}>Loading…</p>}
+        {!listLoading && totalCount === 0 && <p className="text-center py-12" style={{ color: 'var(--border-soft)' }}>No online olympiad rounds open right now. Check back soon.</p>}
         <div className="space-y-4">
           {onlineCards.map(c => (
-            <div key={c.category_id} className="flex gap-5 p-5" style={card}>
+            <div key={`activity-${c.category_id}`} className="flex gap-5 p-5" style={card}>
               {c.cover_image_url && <img src={c.cover_image_url} alt="" className="w-24 h-24 rounded-xl object-cover flex-shrink-0" />}
               <div className="flex-1">
                 <p className="text-xs mb-1" style={{ color: 'var(--border-soft)' }}>{c.session_title}</p>
@@ -454,18 +605,57 @@ export default function OlympiadPage() {
               </button>
             </div>
           ))}
+
+          {openStandalone.map(({ o }) => (
+            <div key={`oly-${o.id}`} className="flex gap-5 p-5" style={{ ...card, borderLeft: o.theme_accent_color ? `3px solid ${o.theme_accent_color}` : card.border }}>
+              {(o.theme_header_logo_url || o.cover_image_url) && <img src={o.theme_header_logo_url || o.cover_image_url} alt="" className="w-24 h-24 rounded-xl object-cover flex-shrink-0" />}
+              <div className="flex-1">
+                <h2 className="font-bold text-lg mb-1" style={{ color: 'var(--white-soft)' }}>{o.name}</h2>
+                {o.description && <p className="text-sm" style={{ color: 'var(--muted)' }}>{o.description}</p>}
+                {o.registration_deadline && <p className="text-xs mt-1" style={{ color: 'var(--border-soft)' }}>Register by {fmtDate(o.registration_deadline)}</p>}
+              </div>
+              <button
+                onClick={() => openStandaloneOlympiad(o.id)}
+                className="self-center px-5 py-2.5 rounded-xl text-sm font-bold flex-shrink-0"
+                style={{ background: o.theme_accent_color || 'linear-gradient(90deg,var(--blue),var(--blue2))', color: '#fff' }}>
+                Register Now
+              </button>
+            </div>
+          ))}
+
+          {greyedStandalone.map(({ o, reason }) => (
+            <div key={`oly-${o.id}`} className="flex gap-5 p-5 opacity-50" style={{ ...card, filter: 'grayscale(0.6)' }}>
+              {o.cover_image_url && <img src={o.cover_image_url} alt="" className="w-24 h-24 rounded-xl object-cover flex-shrink-0" />}
+              <div className="flex-1">
+                <h2 className="font-bold text-lg mb-1" style={{ color: 'var(--white-soft)' }}>{o.name}</h2>
+                {o.description && <p className="text-sm" style={{ color: 'var(--muted)' }}>{o.description}</p>}
+                <p className="text-xs mt-1" style={{ color: 'var(--danger-soft)' }}>{reason}</p>
+              </div>
+              <button
+                disabled
+                className="self-center px-5 py-2.5 rounded-xl text-sm font-bold flex-shrink-0 cursor-not-allowed"
+                style={{ background: 'var(--surface-alt)', color: 'var(--border-soft)', border: '1px solid var(--border)' }}>
+                Unavailable
+              </button>
+            </div>
+          ))}
         </div>
       </div>
     </div>
-  )
+    )
+  }
 
   // ── REGISTER ────────────────────────────────────────────────────────────────
   if (phase === 'register' && selected) return (
-    <div className="min-h-screen py-12 px-4" style={{ background: bg }}>
+    <div className="min-h-screen py-12 px-4" style={theme.pageStyle}>
       <div className="max-w-lg mx-auto">
         <button onClick={() => setPhase('list')} className="text-sm mb-6 flex items-center gap-1" style={{ color: 'var(--muted)' }}>← Back</button>
         <div className="p-6 space-y-4" style={card}>
-          <h2 className="text-xl font-bold" style={{ fontFamily: 'Orbitron, monospace', color: 'var(--blue)' }}>Register — {selected.name}</h2>
+          {theme.headerLogo && <img src={theme.headerLogo} alt="" className="h-12 mx-auto object-contain" />}
+          <div>
+            <h2 className="text-xl font-bold" style={{ fontFamily: 'Orbitron, monospace', color: theme.accent || 'var(--blue)' }}>Register — {theme.headerTitle}</h2>
+            {theme.headerSubtitle && <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{theme.headerSubtitle}</p>}
+          </div>
           {error && <div className="p-3 rounded-lg text-sm flex items-center gap-2" style={{ background: 'rgba(var(--danger-rgb), 0.1)', border: '1px solid rgba(var(--danger-rgb), 0.3)', color: 'var(--danger-soft)' }}><AlertCircle size={14} />{error}</div>}
 
           {/* Mandatory fields */}
@@ -496,7 +686,7 @@ export default function OlympiadPage() {
             </div>
           ))}
 
-          <button onClick={submitRegistration} disabled={submitting} className="w-full py-3 rounded-xl font-bold text-sm" style={{ background: 'linear-gradient(90deg,var(--blue),var(--blue2))', color: '#fff', opacity: submitting ? 0.6 : 1 }}>
+          <button onClick={submitRegistration} disabled={submitting} className="w-full py-3 rounded-xl font-bold text-sm" style={{ ...theme.ctaStyle, opacity: submitting ? 0.6 : 1 }}>
             {submitting ? 'Registering…' : 'Complete Registration →'}
           </button>
         </div>
@@ -506,14 +696,16 @@ export default function OlympiadPage() {
 
   // ── DASHBOARD ────────────────────────────────────────────────────────────────
   if (phase === 'dashboard' && selected) return (
-    <div className="min-h-screen py-12 px-4" style={{ background: bg }}>
+    <div className="min-h-screen py-12 px-4" style={theme.pageStyle}>
       <div className="max-w-lg mx-auto space-y-4">
         <div className="p-6" style={card}>
+          {theme.headerLogo && <img src={theme.headerLogo} alt="" className="h-10 mb-3 object-contain" />}
           <div className="flex items-center gap-2 mb-1">
             <CheckCircle size={18} style={{ color: 'var(--success)' }} />
             <h2 className="font-bold text-lg" style={{ color: 'var(--success)' }}>Registration Successful!</h2>
           </div>
-          <p className="text-sm" style={{ color: 'var(--muted)' }}>{selected.name}</p>
+          <p className="text-sm" style={{ color: 'var(--muted)' }}>{theme.headerTitle}</p>
+          {theme.headerSubtitle && <p className="text-xs mt-0.5" style={{ color: 'var(--border-soft)' }}>{theme.headerSubtitle}</p>}
         </div>
 
         {hasOnlineQuestions(selected) && (
@@ -523,7 +715,7 @@ export default function OlympiadPage() {
               {selected.questions.length} questions · {selected.timer_minutes} minutes · {selected.question_display === 'one_by_one' ? 'One question at a time' : 'All questions at once'}
             </p>
             <p className="text-xs" style={{ color: 'var(--border-soft)' }}>Once you start, the timer begins. It will auto-submit when time runs out.</p>
-            <button onClick={startExam} className="w-full py-3 rounded-xl font-bold text-sm" style={{ background: 'linear-gradient(90deg,var(--blue),var(--blue2))', color: '#fff' }}>
+            <button onClick={startExam} className="w-full py-3 rounded-xl font-bold text-sm" style={theme.ctaStyle}>
               Start Exam →
             </button>
           </div>
@@ -569,15 +761,27 @@ export default function OlympiadPage() {
     const isOneByOne = selected.question_display === 'one_by_one'
     const currentQuestion = questions[currentQ]
 
+    const isAnswered = (q: Question) => {
+      if (q.type === 'mcq') return !!mcqAnswers[q.id]
+      if (q.type === 'checkbox') return Array.isArray(mcqAnswers[q.id]) && (mcqAnswers[q.id] as string[]).length > 0
+      if (q.type === 'short') return !!(shortAnswers[q.id] || '').trim()
+      return !!photoUrls[q.id]
+    }
+
+    const typeColor = (t: QuestionType) => t === 'mcq' ? 'var(--blue)' : t === 'checkbox' ? 'var(--accent2)' : t === 'short' ? 'var(--success)' : 'var(--warning)'
+    const typeLabel = (t: QuestionType) => t === 'mcq' ? 'MCQ' : t === 'checkbox' ? 'Select all that apply' : t === 'short' ? 'Short Answer' : 'Photo Upload'
+
     const renderQuestion = (q: Question, idx: number) => (
       <div key={q.id} className="p-5 rounded-xl space-y-3" style={{ background: 'var(--surface-alt)', border: '1px solid var(--border)' }}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
-            <span className="text-xs px-2 py-0.5 rounded-full mr-2" style={{ background: q.type === 'mcq' ? 'rgba(var(--blue-rgb), 0.09)' : q.type === 'short' ? 'rgba(var(--success-rgb), 0.09)' : 'rgba(var(--warning-rgb), 0.09)', color: q.type === 'mcq' ? 'var(--blue)' : q.type === 'short' ? 'var(--success)' : 'var(--warning)' }}>
-              Q{idx + 1} · {q.type === 'mcq' ? 'MCQ' : q.type === 'short' ? 'Short Answer' : 'Photo Upload'} · {q.marks || 1} mark{(q.marks || 1) > 1 ? 's' : ''}
+            <span className="text-xs px-2 py-0.5 rounded-full mr-2" style={{ background: `${typeColor(q.type)}18`, color: typeColor(q.type) }}>
+              Q{idx + 1} · {typeLabel(q.type)} · {q.marks || 1} mark{(q.marks || 1) > 1 ? 's' : ''}
             </span>
-            <p className="mt-2 text-sm font-medium" style={{ color: 'var(--white-soft)' }}>{q.text}</p>
-            {q.description && <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>{q.description}</p>}
+            {q.required !== false && <span className="text-xs" style={{ color: 'var(--danger-soft)' }}>*required</span>}
+            <p className="mt-2 text-sm font-medium" style={{ color: 'var(--white-soft)' }}><MathText text={q.text} /></p>
+            {q.description && <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}><MathText text={q.description} /></p>}
+            {q.image_url && <img src={q.image_url} alt="" className="mt-2 max-h-56 rounded-lg border" style={{ borderColor: 'var(--border)' }} />}
           </div>
         </div>
 
@@ -586,24 +790,58 @@ export default function OlympiadPage() {
             {(q.options || []).map(o => (
               <label key={o.id} className="flex items-center gap-3 p-3 rounded-lg cursor-pointer" style={{ background: mcqAnswers[q.id] === o.id ? 'rgba(var(--blue-rgb), 0.12)' : 'rgba(255,255,255,0.02)', border: `1px solid ${mcqAnswers[q.id] === o.id ? 'var(--blue)' : 'var(--border)'}` }}>
                 <input type="radio" name={`q-${q.id}`} checked={mcqAnswers[q.id] === o.id} onChange={() => setMcqAnswers(p => ({ ...p, [q.id]: o.id }))} style={{ accentColor: 'var(--blue)' }} />
-                <span className="text-sm" style={{ color: 'var(--white-soft)' }}>{o.text}</span>
+                <span className="text-sm" style={{ color: 'var(--white-soft)' }}><MathText text={o.text} /></span>
               </label>
             ))}
           </div>
         )}
 
+        {q.type === 'checkbox' && (
+          <div className="space-y-2">
+            {(q.options || []).map(o => {
+              const chosen: string[] = Array.isArray(mcqAnswers[q.id]) ? (mcqAnswers[q.id] as string[]) : []
+              const isChecked = chosen.includes(o.id)
+              return (
+                <label key={o.id} className="flex items-center gap-3 p-3 rounded-lg cursor-pointer" style={{ background: isChecked ? 'rgba(var(--accent2-rgb), 0.12)' : 'rgba(255,255,255,0.02)', border: `1px solid ${isChecked ? 'var(--accent2)' : 'var(--border)'}` }}>
+                  <input
+                    type="checkbox" checked={isChecked} style={{ accentColor: 'var(--accent2)' }}
+                    onChange={() => setMcqAnswers(p => {
+                      const cur: string[] = Array.isArray(p[q.id]) ? (p[q.id] as string[]) : []
+                      const next = cur.includes(o.id) ? cur.filter(id => id !== o.id) : [...cur, o.id]
+                      return { ...p, [q.id]: next }
+                    })}
+                  />
+                  <span className="text-sm" style={{ color: 'var(--white-soft)' }}><MathText text={o.text} /></span>
+                </label>
+              )
+            })}
+          </div>
+        )}
+
         {q.type === 'short' && (
-          <textarea rows={3} className="w-full px-4 py-3 rounded-lg text-sm outline-none resize-none" style={inp}
-            placeholder="Type your answer here…"
-            value={shortAnswers[q.id] || ''}
-            onChange={e => setShortAnswers(p => ({ ...p, [q.id]: e.target.value }))} />
+          <div className="space-y-1.5">
+            <MathInputField
+              multiline rows={3}
+              className="w-full px-4 py-3 rounded-lg text-sm outline-none resize-none"
+              style={inp}
+              placeholder="Type your answer here… (tap Σ, or wrap LaTeX in $...$, for equations)"
+              value={shortAnswers[q.id] || ''}
+              onChange={v => setShortAnswers(p => ({ ...p, [q.id]: v }))}
+            />
+            {(shortAnswers[q.id] || '').includes('$') && (
+              <div className="px-3 py-2 rounded-lg text-sm" style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed var(--border)', color: 'var(--white-soft)' }}>
+                <span className="text-xs mr-2" style={{ color: 'var(--border-soft)' }}>Preview:</span>
+                <MathText text={shortAnswers[q.id]} />
+              </div>
+            )}
+          </div>
         )}
 
         {q.type === 'photo' && (
           <div>
             <label className="flex flex-col items-center gap-2 py-5 rounded-xl border-2 border-dashed cursor-pointer" style={{ borderColor: photoUrls[q.id] ? 'var(--success)' : photoFiles[q.id] ? 'var(--blue)' : 'var(--border)', color: 'var(--muted)' }}>
               <Camera size={20} />
-              <span className="text-xs">{photoUrls[q.id] ? '✓ Uploaded' : photoFiles[q.id] ? photoFiles[q.id].name : 'Tap to upload photo answer'}</span>
+              <span className="text-xs inline-flex items-center gap-1">{photoUrls[q.id] ? <><CheckCircle size={12} /> Uploaded</> : photoFiles[q.id] ? photoFiles[q.id].name : 'Tap to upload photo answer'}</span>
               <input type="file" accept="image/*" capture="environment" className="hidden" onChange={async e => {
                 const file = e.target.files?.[0]
                 if (!file) return
@@ -627,18 +865,33 @@ export default function OlympiadPage() {
       </div>
     )
 
+    const validateRequired = (): boolean => {
+      const missing = questions.find(q => q.required !== false && !isAnswered(q))
+      if (missing) {
+        const idx = questions.indexOf(missing)
+        setError(`Please answer question ${idx + 1} — it's required.`)
+        if (isOneByOne) setCurrentQ(idx)
+        return false
+      }
+      setError('')
+      return true
+    }
+
     return (
-      <div className="min-h-screen py-8 px-4" style={{ background: bg }}>
+      <div className="min-h-screen py-8 px-4" style={theme.pageStyle}>
         <div className="max-w-2xl mx-auto">
           {/* Timer bar */}
           <div className="sticky top-4 z-10 flex items-center justify-between px-5 py-3 rounded-xl mb-6" style={{ background: 'var(--surface-deep)', border: '1px solid var(--border)' }}>
-            <span className="font-semibold text-sm" style={{ color: 'var(--white-soft)' }}>{selected.name}</span>
+            <span className="font-semibold text-sm flex items-center gap-2" style={{ color: 'var(--white-soft)' }}>
+              {theme.headerLogo && <img src={theme.headerLogo} alt="" className="h-6 object-contain" />}
+              {theme.headerTitle}
+            </span>
             <div className="flex items-center gap-2">
-              <Clock size={14} style={{ color: timeLeft < 300 ? 'var(--danger-soft)' : 'var(--blue)' }} />
-              <span className="font-mono text-lg font-bold" style={{ color: timeLeft < 300 ? 'var(--danger-soft)' : 'var(--blue)' }}>{fmtTime(timeLeft)}</span>
+              <Clock size={14} style={{ color: timeLeft < 300 ? 'var(--danger-soft)' : (theme.accent || 'var(--blue)') }} />
+              <span className="font-mono text-lg font-bold" style={{ color: timeLeft < 300 ? 'var(--danger-soft)' : (theme.accent || 'var(--blue)') }}>{fmtTime(timeLeft)}</span>
             </div>
             {!isOneByOne && (
-              <button onClick={() => submitExam()} disabled={submitting} className="px-4 py-1.5 rounded-lg text-sm font-bold" style={{ background: 'linear-gradient(90deg,var(--blue),var(--blue2))', color: '#fff', opacity: submitting ? 0.6 : 1 }}>
+              <button onClick={() => { if (validateRequired()) submitExam() }} disabled={submitting} className="px-4 py-1.5 rounded-lg text-sm font-bold" style={{ ...theme.ctaStyle, opacity: submitting ? 0.6 : 1 }}>
                 {submitting ? 'Submitting…' : 'Submit'}
               </button>
             )}
@@ -668,11 +921,14 @@ export default function OlympiadPage() {
                   <ChevronLeft size={14} /> Previous
                 </button>
                 {currentQ < questions.length - 1 ? (
-                  <button onClick={() => setCurrentQ(p => p + 1)} className="px-4 py-2 rounded-lg text-sm flex items-center gap-1 font-medium" style={{ background: 'rgba(var(--blue-rgb), 0.12)', color: 'var(--blue)', border: '1px solid rgba(var(--blue-rgb), 0.3)' }}>
+                  <button onClick={() => {
+                    if (currentQuestion.required !== false && !isAnswered(currentQuestion)) { setError(`Please answer question ${currentQ + 1} — it's required.`); return }
+                    setError(''); setCurrentQ(p => p + 1)
+                  }} className="px-4 py-2 rounded-lg text-sm flex items-center gap-1 font-medium" style={{ background: 'rgba(var(--blue-rgb), 0.12)', color: 'var(--blue)', border: '1px solid rgba(var(--blue-rgb), 0.3)' }}>
                     Next <ChevronRight size={14} />
                   </button>
                 ) : (
-                  <button onClick={() => submitExam()} disabled={submitting} className="px-5 py-2 rounded-lg text-sm font-bold" style={{ background: 'linear-gradient(90deg,var(--blue),var(--blue2))', color: '#fff', opacity: submitting ? 0.6 : 1 }}>
+                  <button onClick={() => { if (validateRequired()) submitExam() }} disabled={submitting} className="px-5 py-2 rounded-lg text-sm font-bold" style={{ ...theme.ctaStyle, opacity: submitting ? 0.6 : 1 }}>
                     {submitting ? 'Submitting…' : 'Submit Exam →'}
                   </button>
                 )}
@@ -681,7 +937,7 @@ export default function OlympiadPage() {
               <div className="flex flex-wrap gap-1.5 mt-4">
                 {questions.map((q, i) => (
                   <button key={q.id} onClick={() => setCurrentQ(i)} className="w-8 h-8 rounded-lg text-xs font-medium"
-                    style={{ background: i === currentQ ? 'var(--blue)' : (mcqAnswers[q.id] || shortAnswers[q.id] || photoUrls[q.id]) ? 'rgba(var(--success-rgb), 0.15)' : 'var(--surface-alt)', color: i === currentQ ? '#000' : (mcqAnswers[q.id] || shortAnswers[q.id] || photoUrls[q.id]) ? 'var(--success)' : 'var(--border-soft)', border: '1px solid var(--border)' }}>
+                    style={{ background: i === currentQ ? 'var(--blue)' : isAnswered(q) ? 'rgba(var(--success-rgb), 0.15)' : 'var(--surface-alt)', color: i === currentQ ? '#000' : isAnswered(q) ? 'var(--success)' : 'var(--border-soft)', border: '1px solid var(--border)' }}>
                     {i + 1}
                   </button>
                 ))}
@@ -690,7 +946,7 @@ export default function OlympiadPage() {
           ) : (
             <div className="space-y-4">
               {questions.map((q, i) => renderQuestion(q, i))}
-              <button onClick={() => submitExam()} disabled={submitting} className="w-full py-3 rounded-xl font-bold text-sm mt-4" style={{ background: 'linear-gradient(90deg,var(--blue),var(--blue2))', color: '#fff', opacity: submitting ? 0.6 : 1 }}>
+              <button onClick={() => { if (validateRequired()) submitExam() }} disabled={submitting} className="w-full py-3 rounded-xl font-bold text-sm mt-4" style={{ ...theme.ctaStyle, opacity: submitting ? 0.6 : 1 }}>
                 {submitting ? 'Submitting…' : 'Submit Exam →'}
               </button>
             </div>
@@ -711,13 +967,14 @@ export default function OlympiadPage() {
   }
 
   if (phase === 'done') return (
-    <div className="min-h-screen flex items-center justify-center py-12 px-4" style={{ background: bg }}>
+    <div className="min-h-screen flex items-center justify-center py-12 px-4" style={theme.pageStyle}>
       <div className="max-w-md w-full p-8 text-center space-y-4" style={card}>
+        {theme.headerLogo && <img src={theme.headerLogo} alt="" className="h-12 mx-auto object-contain" />}
         <CheckCircle size={48} className="mx-auto" style={{ color: 'var(--success)' }} />
         <h2 className="text-xl font-bold" style={{ fontFamily: 'Orbitron, monospace', color: 'var(--success)' }}>Submitted!</h2>
         <p className="text-sm" style={{ color: 'var(--muted)' }}>Your response has been recorded. Results will be announced by the organizers.</p>
         <button onClick={clearSession}
-          className="px-6 py-2.5 rounded-xl text-sm font-medium" style={{ background: 'rgba(var(--blue-rgb), 0.1)', color: 'var(--blue)', border: '1px solid rgba(var(--blue-rgb), 0.2)' }}>
+          className="px-6 py-2.5 rounded-xl text-sm font-medium" style={{ background: 'rgba(var(--blue-rgb), 0.1)', color: theme.accent || 'var(--blue)', border: '1px solid rgba(var(--blue-rgb), 0.2)' }}>
           Back to Olympiads
         </button>
       </div>
@@ -732,10 +989,11 @@ export default function OlympiadPage() {
     const finalScore = regData.final_score ?? regData.mcq_score ?? totalAwarded
 
     return (
-      <div className="min-h-screen py-12 px-4" style={{ background: bg }}>
+      <div className="min-h-screen py-12 px-4" style={theme.pageStyle}>
         <div className="max-w-2xl mx-auto space-y-5">
           <div className="p-6 text-center" style={card}>
-            <h2 className="text-xl font-bold mb-1" style={{ fontFamily: 'Orbitron, monospace', color: 'var(--blue)' }}>{selected.name} — Result</h2>
+            {theme.headerLogo && <img src={theme.headerLogo} alt="" className="h-12 mx-auto mb-2 object-contain" />}
+            <h2 className="text-xl font-bold mb-1" style={{ fontFamily: 'Orbitron, monospace', color: theme.accent || 'var(--blue)' }}>{theme.headerTitle} — Result</h2>
             <p className="text-3xl font-black mt-3" style={{ color: 'var(--success)' }}>
               {finalScore}{totalPossible > 0 ? ` / ${totalPossible}` : ''}
             </p>
@@ -752,11 +1010,11 @@ export default function OlympiadPage() {
               {results.map((r, i) => (
                 <div key={r.question_id || i} className="p-4 rounded-xl" style={{ background: 'var(--surface-alt)', border: `1px solid ${r.is_correct === true ? 'rgba(var(--success-rgb), 0.27)' : r.is_correct === false ? '#ff4d4d44' : 'var(--border)'}` }}>
                   <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-medium flex-1" style={{ color: 'var(--white-soft)' }}>Q{i + 1}. {r.question_text}</p>
+                    <p className="text-sm font-medium flex-1" style={{ color: 'var(--white-soft)' }}>Q{i + 1}. <MathText text={r.question_text} /></p>
                     {r.is_correct === true && <CheckCircle size={16} style={{ color: 'var(--success)', flexShrink: 0 }} />}
-                    {r.is_correct === false && <span style={{ color: 'var(--danger)', flexShrink: 0 }}>✗</span>}
+                    {r.is_correct === false && <X size={13} style={{ color: 'var(--danger)', flexShrink: 0 }} strokeWidth={3} />}
                   </div>
-                  {r.type === 'mcq' && (
+                  {(r.type === 'mcq' || r.type === 'checkbox') && (
                     <div className="mt-2 text-xs space-y-1">
                       <p style={{ color: r.is_correct ? 'var(--success)' : 'var(--danger-soft)' }}>Your answer: {r.student_answer ?? '(not answered)'}</p>
                       {!r.is_correct && <p style={{ color: 'var(--muted)' }}>Correct answer: {r.correct_answer}</p>}

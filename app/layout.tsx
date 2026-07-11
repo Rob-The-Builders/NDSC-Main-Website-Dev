@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
+import "katex/dist/katex.min.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import SurveyNotification from "@/components/SurveyNotification";
 
 export const metadata: Metadata = {
   title: "Notre Dame Science Club (NDSC) | ndscbd.net — Official Website",
@@ -104,6 +106,7 @@ export default function RootLayout({
         <Navbar />
         <main>{children}</main>
         <Footer />
+        <SurveyNotification />
       </body>
     </html>
   );

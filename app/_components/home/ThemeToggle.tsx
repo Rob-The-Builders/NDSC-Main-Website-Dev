@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Sun, Moon } from "lucide-react";
 
 export function ThemeToggle() {
   const [dark, setDark] = useState(true);
@@ -17,7 +18,7 @@ export function ThemeToggle() {
     else document.documentElement.removeAttribute("data-theme");
   };
   return (
-    <button onClick={toggle} className="theme-toggle" title="Toggle theme" aria-label="Toggle theme">{dark ? "☀" : "🌙"}</button>
+    <button onClick={toggle} className="theme-toggle" title="Toggle theme" aria-label="Toggle theme">{dark ? <Sun size={16} /> : <Moon size={16} />}</button>
   );
 }
 

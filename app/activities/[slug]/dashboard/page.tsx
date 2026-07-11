@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, MapPin, Clock, Edit2, Save, Users, Upload, CheckCircle, FileText, ExternalLink, BookOpen, Play } from 'lucide-react'
+import { ArrowLeft, Calendar, MapPin, Clock, Edit2, Save, Users, Upload, CheckCircle, FileText, ExternalLink, BookOpen, Play, XCircle, AlertTriangle, CreditCard, Ban, Pause, X, Hourglass, Microscope } from 'lucide-react'
 
 const inputStyle = { background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--white)' }
 const inputCls = 'w-full px-3 py-2.5 rounded-lg text-sm outline-none'
@@ -65,6 +65,7 @@ export default function ActivityDashboardPage() {
   const [selectedSubject, setSelectedSubject] = useState<string>('')
   const [examScheduledStart, setExamScheduledStart] = useState<string | null>(null)
   const [examStarted, setExamStarted] = useState(false)
+  const [showFullDesc, setShowFullDesc] = useState(false)
 
   const loadRegistration = async (id: string) => {
     setLoading(true)
@@ -327,20 +328,40 @@ export default function ActivityDashboardPage() {
   const examEnded = olympiad?.scheduled_end_at && new Date(olympiad.scheduled_end_at) < new Date()
 
   return (
-    <div className="min-h-screen py-12 px-4" style={{ background: 'var(--bg)', paddingTop: '88px' }}>
+    <div className="min-h-screen py-12 px-4" style={{ background: session?.bg_color || 'var(--bg)', paddingTop: '88px' }}>
       <div className="max-w-lg mx-auto space-y-5">
 
         <Link href={`/activities/${slug}`} className="inline-flex items-center gap-2 text-sm" style={{ color: 'var(--muted)' }}>
           <ArrowLeft size={14} /> Back to activity
         </Link>
 
+        {session?.cover_image_url && (
+          <div className="rounded-2xl overflow-hidden border" style={{ borderColor: 'var(--border)' }}>
+            <img src={session.cover_image_url} alt="" style={{ width: '100%', maxHeight: '200px', objectFit: 'cover' }} />
+          </div>
+        )}
+
         <div>
           <h1 className="text-2xl font-black mb-1" style={{ fontFamily: "'Orbitron', sans-serif", color: 'var(--white)' }}>
             {session?.title}
           </h1>
           <p className="text-sm" style={{ color: 'var(--muted)' }}>{category?.name}</p>
+          {session?.description && (
+            <div className="mt-2">
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--muted)' }}>
+                {session.description.length > 220 && !showFullDesc
+                  ? `${session.description.slice(0, 220).trim()}…`
+                  : session.description}
+              </p>
+              {session.description.length > 220 && (
+                <button onClick={() => setShowFullDesc(s => !s)} className="text-xs font-semibold mt-1" style={{ color: 'var(--blue)' }}>
+                  {showFullDesc ? 'Show less' : 'Show more'}
+                </button>
+              )}
+            </div>
+          )}
           {registration.project_name && (
-            <p className="text-sm mt-1 font-semibold" style={{ color: 'var(--blue)' }}>🔬 {registration.project_name}</p>
+            <p className="text-sm mt-1 font-semibold flex items-center gap-1.5" style={{ color: 'var(--blue)' }}><Microscope size={14} /> {registration.project_name}</p>
           )}
           {viewingMember && (
             <span className="text-xs mt-1 px-2.5 py-1 rounded-full inline-block" style={{ background: 'rgba(var(--accent2-rgb), 0.1)', color: 'var(--accent2)' }}>
@@ -356,10 +377,12 @@ export default function ActivityDashboardPage() {
             background: paymentRedirectStatus === 'success' ? 'rgba(var(--success-rgb), 0.08)' : 'rgba(var(--danger-rgb), 0.08)',
             color: paymentRedirectStatus === 'success' ? 'var(--success)' : 'var(--danger-soft)',
             border: `1px solid ${paymentRedirectStatus === 'success' ? 'rgba(var(--success-rgb), 0.25)' : 'rgba(var(--danger-rgb), 0.25)'}`,
-          }}>
-            {paymentRedirectStatus === 'success' && '✅ Payment received! It may take a moment to fully confirm below.'}
-            {paymentRedirectStatus === 'failed' && '❌ Payment failed. You can try again from your dashboard.'}
-            {paymentRedirectStatus === 'cancelled' && '⚠️ Payment was cancelled.'}
+          }} >
+            <span className="inline-flex items-center gap-1.5">
+              {paymentRedirectStatus === 'success' && <><CheckCircle size={14} /> Payment received! It may take a moment to fully confirm below.</>}
+              {paymentRedirectStatus === 'failed' && <><XCircle size={14} /> Payment failed. You can try again from your dashboard.</>}
+              {paymentRedirectStatus === 'cancelled' && <><AlertTriangle size={14} /> Payment was cancelled.</>}
+            </span>
           </div>
         )}
 
@@ -383,8 +406,8 @@ export default function ActivityDashboardPage() {
             background: registration.payment_status === 'paid' ? 'rgba(var(--success-rgb), 0.08)' : 'rgba(var(--warning-rgb), 0.08)',
             border: `1px solid ${registration.payment_status === 'paid' ? 'rgba(var(--success-rgb), 0.25)' : 'rgba(var(--warning-rgb), 0.25)'}`,
           }}>
-            <p className="text-sm font-bold" style={{ color: registration.payment_status === 'paid' ? 'var(--success)' : 'var(--warning)' }}>
-              💳 Payment: {registration.payment_status === 'paid' ? 'Completed ✓' : registration.payment_status === 'pending' ? 'Pending verification' : 'Failed'}
+            <p className="text-sm font-bold flex items-center gap-1.5" style={{ color: registration.payment_status === 'paid' ? 'var(--success)' : 'var(--warning)' }}>
+              <CreditCard size={14} /> Payment: {registration.payment_status === 'paid' ? <>Completed <CheckCircle size={13} /></> : registration.payment_status === 'pending' ? 'Pending verification' : 'Failed'}
             </p>
             {registration.payment_amount && <p className="text-xs mt-1" style={{ color: 'var(--muted)' }}>৳{registration.payment_amount}</p>}
           </div>
@@ -409,7 +432,7 @@ export default function ActivityDashboardPage() {
 
             {/* Exam ended */}
             {examEnded && (
-              <p className="text-sm" style={{ color: 'var(--danger-soft)' }}>⛔ Submission window has closed.</p>
+              <p className="text-sm flex items-center gap-1.5" style={{ color: 'var(--danger-soft)' }}><Ban size={14} /> Submission window has closed.</p>
             )}
 
             {/* Subject assignment */}
@@ -442,8 +465,8 @@ export default function ActivityDashboardPage() {
                   const isCurrent = i === relayCurrentIndex
                   return (
                     <div key={m.id} className="flex items-center gap-2">
-                      <span style={{ color: done ? 'var(--cat-teal)' : isCurrent ? 'var(--blue)' : 'var(--muted)' }}>
-                        {done ? '✅' : isCurrent ? '▶' : '⏸'}
+                      <span style={{ color: done ? 'var(--cat-teal)' : isCurrent ? 'var(--blue)' : 'var(--muted)' }} className="inline-flex items-center">
+                        {done ? <CheckCircle size={14} /> : isCurrent ? <Play size={13} fill="currentColor" /> : <Pause size={13} />}
                       </span>
                       <span style={{ color: done ? 'var(--cat-teal)' : isCurrent ? 'var(--white)' : 'var(--muted)' }}>
                         {m.full_name} {i === 0 ? '(Leader)' : ''}
@@ -482,8 +505,8 @@ export default function ActivityDashboardPage() {
             {/* File/text submission form */}
             {hasSubmissionConfig && canSubmit && !examNotYetStarted && !examEnded && isMyRelayTurn && (
               <div className="space-y-4">
-                <p className="text-sm font-semibold" style={{ color: 'var(--white)' }}>
-                  {mySubmission?.is_final ? '✅ Submitted' : mySubmission ? 'Update Submission' : 'Submit Now'}
+                <p className="text-sm font-semibold flex items-center gap-1.5" style={{ color: 'var(--white)' }}>
+                  {mySubmission?.is_final ? <><CheckCircle size={14} /> Submitted</> : mySubmission ? 'Update Submission' : 'Submit Now'}
                 </p>
 
                 {mySubmission?.is_final ? (
@@ -510,7 +533,7 @@ export default function ActivityDashboardPage() {
                                   {url.split('/').pop()}
                                 </span>
                                 <a href={url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--blue)' }}><ExternalLink size={11} /></a>
-                                <button onClick={() => removeFileFromField(field.id, idx)} style={{ color: 'var(--danger-soft)' }}>✕</button>
+                                <button onClick={() => removeFileFromField(field.id, idx)} style={{ color: 'var(--danger-soft)' }}><X size={11} /></button>
                               </div>
                             ))}
                             {/* Upload button */}
@@ -546,11 +569,11 @@ export default function ActivityDashboardPage() {
                       <button onClick={() => submitAnswers(true)} disabled={submitting}
                         className="flex-1 py-2.5 rounded-xl text-sm font-bold text-black disabled:opacity-60"
                         style={{ background: 'var(--blue)', fontFamily: "'Orbitron', sans-serif" }}>
-                        {submitting ? 'Submitting…' : 'Submit Final ✓'}
+                        {submitting ? 'Submitting…' : <>Submit Final <CheckCircle size={13} /></>}
                       </button>
                     </div>
-                    <p className="text-xs" style={{ color: 'var(--muted)' }}>
-                      ⚠️ Final submission cannot be changed. Save as draft to continue later.
+                    <p className="text-xs flex items-start gap-1" style={{ color: 'var(--muted)' }}>
+                      <AlertTriangle size={12} className="shrink-0 mt-0.5" /> Final submission cannot be changed. Save as draft to continue later.
                     </p>
                   </>
                 )}
@@ -616,8 +639,8 @@ export default function ActivityDashboardPage() {
                     {m.full_name} {m.id === viewAsTeamMemberId && <span style={{ color: 'var(--accent2)' }}>(you)</span>}
                   </span>
                   {relayState && (
-                    <span className="text-xs" style={{ color: (relayState.member_submissions as any[]).find((s: any) => s.member_id === m.id) ? 'var(--cat-teal)' : 'var(--muted)' }}>
-                      {(relayState.member_submissions as any[]).find((s: any) => s.member_id === m.id) ? '✅ Done' : '⏳ Pending'}
+                    <span className="text-xs inline-flex items-center gap-1" style={{ color: (relayState.member_submissions as any[]).find((s: any) => s.member_id === m.id) ? 'var(--cat-teal)' : 'var(--muted)' }}>
+                      {(relayState.member_submissions as any[]).find((s: any) => s.member_id === m.id) ? <><CheckCircle size={12} /> Done</> : <><Hourglass size={12} /> Pending</>}
                     </span>
                   )}
                 </div>
