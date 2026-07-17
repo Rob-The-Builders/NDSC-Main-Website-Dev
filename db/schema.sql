@@ -209,7 +209,12 @@ create table if not exists activity_sessions (
   -- from schema_update_05.sql (Task 1 — Activity Update):
   image_display_mode    text not null default 'cover',   -- 'cover' (fixed box, events) | 'native' (statement sites/posters)
   reg_status            text,                            -- admin-defined label, e.g. Open | Closed | Judging | Results Out
-  reg_deadline          timestamptz                       -- shown as countdown/date on the user dashboard
+  reg_deadline          timestamptz,                      -- shown as countdown/date on the user dashboard
+  -- from schema_update_06.sql — site-wide "new event" popup (mirrors surveys.show_notification):
+  -- when true, this session is eligible to appear as the entry-popup in ActivityNotification
+  -- (components/ActivityNotification.tsx) for every visitor, until the admin turns it back off
+  -- or the event's date passes.
+  notify_publicly        boolean not null default false
 );
 
 -- ── activity_updates — per-event admin updates/announcements feed ───────
@@ -471,3 +476,5 @@ create index if not exists idx_survey_responses_member_id on survey_responses(me
 -- create policy "members can view own row" on members
 --   for select using (auth.uid() = id);
 -- ... repeat per table as needed for your security model
+alter table activity_sessions
+  add column if not exists notify_publicly boolean not null default false;
