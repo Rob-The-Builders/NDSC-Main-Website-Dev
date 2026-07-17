@@ -405,6 +405,12 @@ create table if not exists olympiad_registrations (
 );
 
 -- ── form_configs ─────────────────────────────────────────────────────────
+-- Global form appearance overrides keyed by form_key ("activity_register",
+-- "olympiad_register:<id>", "membership", ...). Per-event appearance used
+-- to live here as rows with form_key like "activity_register:<sessionId>",
+-- but those were migrated to the 1:1 activity_session_form_appearance
+-- table below (which keeps activity_sessions lean — most sessions don't
+-- customize appearance, and a 1:1 table makes that a single-row check).
 create table if not exists form_configs (
   id               uuid primary key default gen_random_uuid(),
   form_key         text unique,                              -- "activity_register", "olympiad_register:<id>", ...
@@ -412,7 +418,6 @@ create table if not exists form_configs (
   subtitle         text,
   cover_photo_url  text,
   bg_theme         text default 'default',
-  primary_fields   jsonb default '[]',
   extra_fields     jsonb default '[]',
   contact_persons  jsonb default '[]',
   -- registration-form appearance pipeline, from schema_update_05.sql,
@@ -426,6 +431,31 @@ create table if not exists form_configs (
   auto_pull_description  boolean not null default false,
   auto_pull_cover        boolean not null default false,
   updated_at       timestamptz default now()
+);
+
+-- ── activity_session_form_appearance ─────────────────────────────────────
+-- 1:1 with activity_sessions. Holds the per-session registration-form
+-- appearance overrides (title, subtitle, cover, bg, font, contact
+-- persons, auto-pull toggles). Replaces the old per-event
+-- form_configs rows with form_key like "activity_register:<sessionId>".
+-- Read by /api/activity-session-appearance-public and
+-- /api/admin/activity-session-appearance; written by the admin Appearance
+-- tab on /admin/activity-registration/[sessionId].
+create table if not exists activity_session_form_appearance (
+  session_id              uuid primary key references activity_sessions(id) on delete cascade,
+  form_title              text,
+  form_subtitle           text,
+  form_cover_photo_url    text,
+  form_cover_aspect_ratio text default 'auto',        -- 'auto' | '16/9' | '4/3' | '1/1' | '21/9'
+  form_bg_theme           text default 'default',
+  form_bg_color           text,
+  form_bg_image_url       text,
+  form_font_family        text default 'default',     -- 'default' | 'orbitron' | 'rajdhani' | 'jakarta' | 'mono'
+  form_auto_pull_title    boolean not null default false,
+  form_auto_pull_description boolean not null default false,
+  form_auto_pull_cover    boolean not null default false,
+  form_contact_persons    jsonb default '[]',
+  updated_at              timestamptz default now()
 );
 
 -- ── surveys / survey_responses (from schema_update_03.sql) ──────────────
@@ -476,5 +506,3 @@ create index if not exists idx_survey_responses_member_id on survey_responses(me
 -- create policy "members can view own row" on members
 --   for select using (auth.uid() = id);
 -- ... repeat per table as needed for your security model
-alter table activity_sessions
-  add column if not exists notify_publicly boolean not null default false;
