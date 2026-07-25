@@ -193,7 +193,7 @@ function CollapsibleText({
       <button
         onClick={() => setExpanded(!expanded)}
         className="mt-4 flex items-center gap-2 text-xs font-black tracking-widest px-4 py-2 rounded-lg border transition-all hover:bg-[var(--blue)] hover:text-black group"
-        style={{ borderColor: "var(--blue)", color: "var(--blue)", fontFamily: "'Orbitron',sans-serif" }}
+        style={{ borderColor: "var(--blue)", color: "var(--blue)", fontFamily: 'inherit' }}
       >
         {expanded ? "SHOW LESS ▲" : "READ MORE ▼"}
       </button>
@@ -228,7 +228,7 @@ function CollapsibleText2({
       <button
         onClick={() => setExpanded(!expanded)}
         className="mt-4 flex items-center gap-2 text-xs font-black tracking-widest px-4 py-2 rounded-lg border transition-all hover:bg-[var(--blue)] hover:text-black"
-        style={{ borderColor: "var(--blue)", color: "var(--blue)", fontFamily: "'Orbitron',sans-serif" }}
+        style={{ borderColor: "var(--blue)", color: "var(--blue)", fontFamily: 'inherit' }}
       >
         {expanded ? "SHOW LESS ▲" : "READ MORE ▼"}
       </button>
@@ -264,8 +264,8 @@ export default function AboutPage() {
 
         {/* Hero heading — centered */}
         <div className="relative max-w-3xl mx-auto px-4 sm:px-6 text-center mb-10">
-          <div className="section-label justify-center mb-3">[ EST. 1955 ]</div>
-          <h1 className="text-4xl sm:text-6xl font-black mb-5" style={{ fontFamily: "'Orbitron',sans-serif" }}>
+          <div className="reveal section-label justify-center mb-3">[ EST. 1955 ]</div>
+          <h1 className="reveal text-4xl sm:text-6xl font-black mb-5" style={{ fontFamily: 'inherit' }}>
             ABOUT <span style={{ color: "var(--blue)" }}>NDSC</span>
           </h1>
         </div>
@@ -303,16 +303,16 @@ export default function AboutPage() {
       {/* ══ HISTORY ARTICLE ═══════════════════════════════════ */}
       <section className="py-16 sm:py-20" style={{ background: "var(--bg2)" }}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <div className="section-label mb-2">Historical Narrative</div>
-          <h2 className="text-2xl sm:text-3xl font-black mb-3" style={{ fontFamily: "'Orbitron',sans-serif" }}>
+          <div className="reveal section-label mb-2">Historical Narrative</div>
+          <h2 className="reveal text-2xl sm:text-3xl font-black mb-3" style={{ fontFamily: 'inherit' }}>
             OUR <span style={{ color: "var(--blue)" }}>LEGACY</span>
           </h2>
-          <p className="text-xs mb-8" style={{ color: "var(--muted)", fontFamily: "'Share Tech Mono',monospace", letterSpacing: "0.1em" }}>
+          <p className="reveal text-xs mb-8" style={{ color: "var(--muted)", fontFamily: "var(--font-mono)", letterSpacing: "0.1em" }}>
             A Comprehensive Historical Account (1955 – 2026)
           </p>
 
           {/* Pull quote */}
-          <div className="relative pl-5 mb-8 border-l-2" style={{ borderColor: "var(--blue)" }}>
+          <div className="reveal relative pl-5 mb-8 border-l-2" style={{ borderColor: "var(--blue)" }}>
             <p className="text-base sm:text-lg font-semibold italic leading-relaxed" style={{ color: "var(--white)" }}>
               &ldquo;The pioneer science club of the Indian Subcontinent — 70 years of igniting curiosity, innovation, and scientific excellence.&rdquo;
             </p>
@@ -349,11 +349,11 @@ export default function AboutPage() {
       {/* ══ DEPARTMENTS ═════════════════════════════════════════ */}
       <section id="departments" className="py-16 sm:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="section-label mb-2">Structure</div>
-          <h2 className="text-2xl sm:text-3xl font-black mb-3" style={{ fontFamily: "'Orbitron',sans-serif" }}>
+          <div className="reveal section-label mb-2">Structure</div>
+          <h2 className="reveal text-2xl sm:text-3xl font-black mb-3" style={{ fontFamily: 'inherit' }}>
             OUR <span style={{ color: "var(--blue)" }}>DEPARTMENTS</span>
           </h2>
-          <p className="text-sm mb-12 max-w-xl" style={{ color: "var(--muted)" }}>
+          <p className="reveal text-sm mb-12 max-w-xl" style={{ color: "var(--muted)" }}>
             NDSC is structured into 7 specialized departments, each driving a unique aspect of our scientific mission.
           </p>
 
@@ -385,7 +385,7 @@ export default function AboutPage() {
                 {/* Number badge */}
                 <div
                   className="absolute top-4 right-4 text-xs font-black opacity-20"
-                  style={{ fontFamily: "'Orbitron',sans-serif", color: d.color, fontSize: "2rem", lineHeight: 1 }}
+                  style={{ fontFamily: 'inherit', color: d.color, fontSize: "2rem", lineHeight: 1 }}
                 >
                   {String(i + 1).padStart(2, "0")}
                 </div>
@@ -402,7 +402,7 @@ export default function AboutPage() {
                   </div>
                   <h3
                     className="font-black text-sm tracking-wider mb-3"
-                    style={{ fontFamily: "'Orbitron',sans-serif", color: d.color }}
+                    style={{ fontFamily: 'inherit', color: d.color }}
                   >
                     {d.name}
                   </h3>
@@ -424,24 +424,24 @@ export default function AboutPage() {
       {/* ══ MODERATOR MESSAGE ════════════════════════════════════ */}
       <section id="moderator" className="py-16 sm:py-20" style={{ background: "var(--bg2)" }}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <div className="section-label mb-2">Message</div>
-          <h2 className="text-2xl sm:text-3xl font-black mb-8" style={{ fontFamily: "'Orbitron',sans-serif" }}>
+          <div className="reveal section-label mb-2">Message</div>
+          <h2 className="reveal text-2xl sm:text-3xl font-black mb-8" style={{ fontFamily: 'inherit' }}>
             FROM THE <span style={{ color: "var(--accent2)" }}>MODERATOR</span>
           </h2>
           <div
-            className="p-6 sm:p-10 rounded-2xl border relative overflow-hidden"
+            className="reveal card-lift p-6 sm:p-10 rounded-2xl border relative overflow-hidden"
             style={{ borderColor: "rgba(var(--accent2-rgb), 0.35)", background: "rgba(var(--accent2-rgb), 0.04)" }}
           >
             <div
               className="absolute top-4 right-6 text-9xl font-black leading-none select-none pointer-events-none"
-              style={{ color: "rgba(var(--accent2-rgb), 0.06)", fontFamily: "'Orbitron',sans-serif" }}
+              style={{ color: "rgba(var(--accent2-rgb), 0.06)", fontFamily: 'inherit' }}
             >"</div>
             <div className="flex flex-col sm:flex-row gap-5 sm:gap-8 items-start mb-6">
               <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 shrink-0" style={{ borderColor: "var(--accent2)" }}>
                 <Image src="https://uploads.ndscbd.net/executives/1780621402_fdc8d88bf714.jpg" alt="Moderator" fill className="object-cover" />
               </div>
               <div>
-                <h3 className="font-black text-base" style={{ fontFamily: "'Orbitron',sans-serif" }}>Dr. Vincent Titas Rozario</h3>
+                <h3 className="font-black text-base" style={{ fontFamily: 'inherit' }}>Dr. Vincent Titas Rozario</h3>
                 <p className="text-sm font-bold" style={{ color: "var(--accent2)" }}>Moderator</p>
                 <p className="text-xs" style={{ color: "var(--muted)" }}>Notre Dame Science Club</p>
               </div>
@@ -461,24 +461,24 @@ export default function AboutPage() {
       {/* ══ GS MESSAGE ══════════════════════════════════════════ */}
       <section id="gs" className="py-16 sm:py-20">
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <div className="section-label mb-2">Message</div>
-          <h2 className="text-2xl sm:text-3xl font-black mb-8" style={{ fontFamily: "'Orbitron',sans-serif" }}>
+          <div className="reveal section-label mb-2">Message</div>
+          <h2 className="reveal text-2xl sm:text-3xl font-black mb-8" style={{ fontFamily: 'inherit' }}>
             FROM THE <span style={{ color: "var(--blue)" }}>GENERAL SECRETARY</span>
           </h2>
           <div
-            className="p-6 sm:p-10 rounded-2xl border relative overflow-hidden"
+            className="reveal card-lift p-6 sm:p-10 rounded-2xl border relative overflow-hidden"
             style={{ borderColor: "rgba(var(--blue-rgb), .3)", background: "rgba(var(--blue-rgb), .03)" }}
           >
             <div
               className="absolute top-4 right-6 text-9xl font-black leading-none select-none pointer-events-none"
-              style={{ color: "rgba(var(--blue-rgb), 0.05)", fontFamily: "'Orbitron',sans-serif" }}
+              style={{ color: "rgba(var(--blue-rgb), 0.05)", fontFamily: 'inherit' }}
             >"</div>
             <div className="flex flex-col sm:flex-row gap-5 sm:gap-8 items-start mb-6">
               <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 shrink-0" style={{ borderColor: "var(--blue)" }}>
                 <Image src="https://uploads.ndscbd.net/executives/1780619755_f8a427c9fe3d.jpg" alt="GS" fill className="object-cover" />
               </div>
               <div>
-                <h3 className="font-black text-base" style={{ fontFamily: "'Orbitron',sans-serif" }}>Fahim Faisal Arnob</h3>
+                <h3 className="font-black text-base" style={{ fontFamily: 'inherit' }}>Fahim Faisal Arnob</h3>
                 <p className="text-sm font-bold" style={{ color: "var(--blue)" }}>General Secretary</p>
                 <p className="text-xs" style={{ color: "var(--muted)" }}>Notre Dame Science Club · 2025–2026</p>
               </div>
@@ -494,7 +494,7 @@ export default function AboutPage() {
             <Link
               href="/executives"
               className="inline-block mt-6 px-5 py-2 text-xs font-black tracking-widest rounded-lg border transition-all hover:bg-[var(--blue)] hover:text-black"
-              style={{ borderColor: "var(--blue)", color: "var(--blue)", fontFamily: "'Orbitron',sans-serif" }}
+              style={{ borderColor: "var(--blue)", color: "var(--blue)", fontFamily: 'inherit' }}
             >
               VIEW ALL EXECUTIVES →
             </Link>
@@ -503,21 +503,52 @@ export default function AboutPage() {
       </section>
 
       {/* ══ MOTTO ════════════════════════════════════════════════ */}
-      <section className="py-16 sm:py-20 text-center" style={{ background: "var(--bg2)" }}>
+      <section className="py-20 sm:py-24 text-center" style={{ background: "var(--bg2)" }}>
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <div className="relative w-28 h-28 sm:w-36 sm:h-36 rounded-full border mx-auto mb-8 flex items-center justify-center"
-            style={{ borderColor: "var(--border)" }}>
-            <div className="absolute inset-0 rounded-full border border-dashed"
-              style={{ borderColor: "var(--blue)", opacity: .4, animation: "spin 10s linear infinite" }} />
-            <div className="absolute inset-[-12px] rounded-full border border-dashed"
-              style={{ borderColor: "var(--blue2)", opacity: .2, animation: "spin 16s linear infinite reverse" }} />
-            <Image src="/images/cropped-logo.png" alt="NDSC" width={80} height={80} className="object-contain relative z-10" />
+          {/* Motto mark — replaces the old two spinning dashed circles with
+              a single conic-gradient sweep ring (one rotation, 6s) and a
+              subtle scale-pulse on the inner logo. Reads as deliberate,
+              not as a CSS demo. */}
+          <div
+            className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-full mx-auto mb-10 flex items-center justify-center"
+            style={{ border: "1px solid var(--border)" }}
+          >
+            <span
+              aria-hidden="true"
+              className="absolute inset-[-6px] rounded-full conic-sweep"
+            />
+            <span
+              aria-hidden="true"
+              className="absolute inset-[-2px] rounded-full"
+              style={{
+                background: "radial-gradient(circle, transparent 60%, rgba(var(--blue-rgb), 0.12) 100%)",
+              }}
+            />
+            <div
+              className="logo-float-anim"
+              style={{ animationDuration: "6s" }}
+            >
+              <Image
+                src="/images/cropped-logo.png"
+                alt="NDSC"
+                width={84}
+                height={84}
+                className="object-contain relative z-10"
+                style={{ filter: "drop-shadow(0 0 14px rgba(var(--blue-rgb), 0.5))" }}
+              />
+            </div>
           </div>
-          <div className="section-label justify-center mb-3">Our Motto</div>
-          <h2 className="text-3xl sm:text-5xl font-black mb-5" style={{ fontFamily: "'Orbitron',sans-serif" }}>
+          <div className="reveal section-label justify-center mb-3">Our Motto</div>
+          <h2
+            className="reveal text-3xl sm:text-5xl font-black mb-5"
+            style={{ fontFamily: 'inherit' }}
+          >
             <span style={{ color: "var(--blue)" }}>SCIENCE</span> IN<br />HUMAN WELFARE
           </h2>
-          <p className="text-sm sm:text-base leading-relaxed max-w-xl mx-auto" style={{ color: "var(--muted)" }}>
+          <p
+            className="reveal text-sm sm:text-base leading-relaxed max-w-xl mx-auto"
+            style={{ color: "var(--muted)" }}
+          >
             This motto reflects our belief that science is not just an academic pursuit — it is a tool
             for improving lives, solving real-world problems, and creating a better future for humanity.
             Every activity we organize, every article we publish, and every olympiad we host is guided by this core principle.
@@ -528,11 +559,11 @@ export default function AboutPage() {
       {/* ══ FULL MILESTONES TABLE ════════════════════════════════ */}
       <section className="py-16 sm:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="section-label mb-2">Chronological Record</div>
-          <h2 className="text-2xl sm:text-4xl font-black mb-3" style={{ fontFamily: "'Orbitron',sans-serif" }}>
+          <div className="reveal section-label mb-2">Chronological Record</div>
+          <h2 className="reveal text-2xl sm:text-4xl font-black mb-3" style={{ fontFamily: 'inherit' }}>
             KEY <span style={{ color: "var(--blue)" }}>MILESTONES</span>
           </h2>
-          <p className="text-sm mb-12 max-w-xl" style={{ color: "var(--muted)" }}>
+          <p className="reveal text-sm mb-12 max-w-xl" style={{ color: "var(--muted)" }}>
             40+ key milestones chronicling NDSC&apos;s journey from 1953 to its 70th Anniversary in 2026.
           </p>
 
@@ -547,7 +578,7 @@ export default function AboutPage() {
                     onClick={() => setActiveEra(i)}
                     className="px-3 py-1.5 rounded-full text-xs font-bold border transition-all duration-200"
                     style={{
-                      fontFamily: "'Share Tech Mono', monospace",
+                      fontFamily: "var(--font-mono)",
                       background: activeEra === i ? e.color : "transparent",
                       color: activeEra === i ? "#000" : "var(--muted)",
                       borderColor: activeEra === i ? e.color : "var(--border)",
@@ -559,10 +590,13 @@ export default function AboutPage() {
                 ))}
               </div>
 
-              {/* Active era detail card */}
+              {/* Active era detail card — key={activeEra} makes React remount
+                  it on era change, so the .reveal class re-runs and gives
+                  a clean crossfade between eras. */}
               {(() => { const EraIcon = ERAS[activeEra].icon; return (
               <div
-                className="p-6 sm:p-8 rounded-2xl border mb-6 transition-all duration-300"
+                key={activeEra}
+                className="reveal p-6 sm:p-8 rounded-2xl border mb-6"
                 style={{ borderColor: ERAS[activeEra].color + "55", background: ERAS[activeEra].color + "0a" }}
               >
                 <div className="flex items-center gap-3 mb-4">
@@ -570,11 +604,11 @@ export default function AboutPage() {
                   <div>
                     <p
                       className="text-xs font-bold tracking-widest"
-                      style={{ fontFamily: "'Share Tech Mono', monospace", color: ERAS[activeEra].color }}
+                      style={{ fontFamily: "var(--font-mono)", color: ERAS[activeEra].color }}
                     >
                       {ERAS[activeEra].year}
                     </p>
-                    <h4 className="text-base sm:text-lg font-black" style={{ fontFamily: "'Orbitron',sans-serif" }}>
+                    <h4 className="text-base sm:text-lg font-black" style={{ fontFamily: 'inherit' }}>
                       {ERAS[activeEra].label}
                     </h4>
                   </div>
@@ -590,7 +624,7 @@ export default function AboutPage() {
                       <span
                         className="shrink-0 text-xs font-black mt-0.5"
                         style={{
-                          fontFamily: "'Share Tech Mono',monospace",
+                          fontFamily: "var(--font-mono)",
                           color: ERAS[activeEra].color,
                           minWidth: "4.5rem",
                         }}
@@ -642,7 +676,7 @@ export default function AboutPage() {
                         <e.icon size={13} style={{ color: activeEra === i ? e.color : "var(--muted)" }} />
                         <span
                           className="text-xs font-black tracking-wider"
-                          style={{ fontFamily: "'Orbitron',sans-serif", color: activeEra === i ? e.color : "var(--muted)", fontSize: "0.65rem" }}
+                          style={{ fontFamily: 'inherit', color: activeEra === i ? e.color : "var(--muted)", fontSize: "0.65rem" }}
                         >
                           {e.year}
                         </span>
@@ -660,7 +694,7 @@ export default function AboutPage() {
                             <div key={mi} className="flex gap-2 items-start">
                               <span
                                 className="shrink-0 text-xs font-bold"
-                                style={{ fontFamily: "'Share Tech Mono',monospace", color: e.color, minWidth: "4rem", fontSize: "0.6rem" }}
+                                style={{ fontFamily: "var(--font-mono)", color: e.color, minWidth: "4rem", fontSize: "0.6rem" }}
                               >
                                 {m.y}
                               </span>
@@ -682,15 +716,19 @@ export default function AboutPage() {
 
           {/* Stats row */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-14">
-            {[["70+", "Years of Legacy"], ["5000+", "Alumni Members"], ["100+", "Events Hosted"], ["7", "Departments"]].map(([n, l]) => (
+            {[["70+", "Years of Legacy"], ["5000+", "Alumni Members"], ["100+", "Events Hosted"], ["7", "Departments"]].map(([n, l], i) => (
               <div
                 key={l}
-                className="p-5 rounded-xl border text-center card-hover"
-                style={{ borderColor: "var(--border)", background: "var(--card)" }}
+                className="reveal card-lift p-5 rounded-xl border text-center"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--card)",
+                  transitionDelay: `${i * 0.08}s`,
+                }}
               >
                 <p
                   className="text-2xl sm:text-3xl font-black mb-1"
-                  style={{ fontFamily: "'Orbitron',sans-serif", color: "var(--blue)", filter: "drop-shadow(0 0 8px var(--glow))" }}
+                  style={{ fontFamily: 'inherit', color: "var(--blue)", filter: "drop-shadow(0 0 8px var(--glow))" }}
                 >
                   {n}
                 </p>
@@ -704,25 +742,29 @@ export default function AboutPage() {
       {/* ══ GOALS ════════════════════════════════════════════════ */}
       <section className="py-16 sm:py-20" style={{ background: "var(--bg2)" }}>
         <div className="max-w-4xl mx-auto px-4 sm:px-6">
-          <div className="section-label mb-2">Mission</div>
-          <h2 className="text-2xl sm:text-3xl font-black mb-10" style={{ fontFamily: "'Orbitron',sans-serif" }}>
+          <div className="reveal section-label mb-2">Mission</div>
+          <h2 className="reveal text-2xl sm:text-3xl font-black mb-10" style={{ fontFamily: 'inherit' }}>
             OUR <span style={{ color: "var(--blue)" }}>GOALS</span>
           </h2>
           <div className="space-y-4">
             {GOALS.map((g, i) => (
               <div
                 key={g.title}
-                className="flex gap-5 p-5 sm:p-6 rounded-xl border transition-all hover:border-[var(--blue)] hover:translate-x-1"
-                style={{ borderColor: "var(--border)", background: "var(--card)" }}
+                className="reveal card-lift flex gap-5 p-5 sm:p-6 rounded-xl border"
+                style={{
+                  borderColor: "var(--border)",
+                  background: "var(--card)",
+                  transitionDelay: `${i * 0.06}s`,
+                }}
               >
                 <span
                   className="text-xl sm:text-2xl font-black shrink-0 opacity-25 leading-none pt-1"
-                  style={{ fontFamily: "'Orbitron',sans-serif", color: "var(--blue)" }}
+                  style={{ fontFamily: 'inherit', color: "var(--blue)" }}
                 >
                   {String(i + 1).padStart(2, "0")}
                 </span>
                 <div>
-                  <h3 className="font-bold text-sm mb-1" style={{ fontFamily: "'Orbitron',sans-serif" }}>{g.title}</h3>
+                  <h3 className="font-bold text-sm mb-1" style={{ fontFamily: 'inherit' }}>{g.title}</h3>
                   <p className="text-xs leading-relaxed" style={{ color: "var(--muted)" }}>{g.desc}</p>
                 </div>
               </div>

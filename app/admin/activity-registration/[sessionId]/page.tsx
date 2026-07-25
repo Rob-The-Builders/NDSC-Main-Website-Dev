@@ -2,11 +2,12 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, Trash2, ChevronRight, ChevronDown, ArrowLeft, Users, CreditCard, Link2, Calendar, X, Zap, Upload, Microscope, FileText, Images, Youtube, ImageIcon, Lock, Check, Sparkles, Save } from 'lucide-react'
+import { Plus, Trash2, ChevronRight, ChevronDown, ArrowLeft, Users, CreditCard, Link2, Calendar, X, Zap, Upload, Microscope, FileText, Images, Youtube, ImageIcon, Lock, Check, Sparkles, Save, Download, Workflow } from 'lucide-react'
 import MathInputField from '@/components/olympiad/MathInputField'
 import { FormBlock, normalizeBlocks, builtinFieldDefs } from '@/lib/formBlocks'
 import FieldsEditor from '@/components/admin/FieldsEditor'
 import ContactPersonsEditor from '@/components/admin/ContactPersonsEditor'
+import { FormGraphBuilderForOwner } from '@/components/admin/FormGraphBuilder'
 import { THEME_PRESETS, FONT_OPTIONS, COVER_RATIO_OPTIONS } from '@/lib/appearancePresets'
 import { resolveAccent, resolveFont } from '@/lib/appearance'
 
@@ -33,6 +34,7 @@ type Category = {
   icon: string | null
   bg_image_url: string | null
   requires_team: boolean
+  team_optional: boolean
   team_size_min: number | null
   team_size_max: number | null
   team_member_fields: CustomField[]
@@ -62,7 +64,7 @@ const deriveOnlineType = (o?: Category['linked_olympiad']): string => {
 }
 
 const s = { background: 'var(--bg2)', borderColor: 'var(--border)' }
-const h = { fontFamily: "'Orbitron', sans-serif", color: 'var(--blue)' }
+const h = { fontFamily: 'inherit', color: 'var(--blue)' }
 const inputCls = 'w-full px-3 py-2 rounded-lg text-sm outline-none border'
 const inputStyle = { background: 'var(--surface)', borderColor: 'var(--border)', color: 'var(--white)' }
 
@@ -79,7 +81,7 @@ export default function ActivityRegistrationBuilder() {
   const [error, setError] = useState('')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
-  const [tab, setTab] = useState<'builder' | 'registrants' | 'appearance' | 'files' | 'updates'>('appearance')
+  const [tab, setTab] = useState<'builder' | 'flow' | 'registrants' | 'appearance' | 'files' | 'updates'>('appearance')
 
   const load = async () => {
     try {
@@ -105,7 +107,7 @@ export default function ActivityRegistrationBuilder() {
   // Registration is the main workflow once it's on; otherwise start on
   // Appearance since Builder/Registrants have nothing to show yet.
   useEffect(() => {
-    if (session) setTab(session.registration_enabled ? 'builder' : 'appearance')
+    if (session) setTab(session.registration_enabled ? 'flow' : 'appearance')
   }, [session?.id, session?.registration_enabled])
 
   const toggleExpand = (id: string) => {
@@ -291,12 +293,19 @@ export default function ActivityRegistrationBuilder() {
           style={tab === 'files' ? { background: 'rgba(var(--blue-rgb), 0.15)', color: 'var(--blue)', border: '1px solid rgba(var(--blue-rgb), 0.4)' } : { background: 'var(--surface-deep)', color: 'var(--muted)', border: '1px solid var(--border)' }}>
           Files
         </button>
+        <button onClick={() => session?.registration_enabled && setTab('flow')}
+          disabled={!session?.registration_enabled}
+          title={!session?.registration_enabled ? 'Turn on "Registration" for this session (Activities admin) to unlock this' : 'The public registration form — branching, presets, and multi-step flows'}
+          className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+          style={tab === 'flow' ? { background: 'rgba(var(--blue-rgb), 0.15)', color: 'var(--blue)', border: '1px solid rgba(var(--blue-rgb), 0.4)' } : { background: 'var(--surface-deep)', color: 'var(--muted)', border: '1px solid var(--border)' }}>
+          <span className="inline-flex items-center gap-1.5"><Workflow size={13} /> Form Builder{!session?.registration_enabled && <Lock size={11} />}</span>
+        </button>
         <button onClick={() => session?.registration_enabled && setTab('builder')}
           disabled={!session?.registration_enabled}
-          title={!session?.registration_enabled ? 'Turn on "Registration" for this session (Activities admin) to unlock this' : ''}
+          title={!session?.registration_enabled ? 'Turn on "Registration" for this session (Activities admin) to unlock this' : "Old category system — no longer shown on the public event page. Kept for viewing/editing past setups."}
           className="px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
           style={tab === 'builder' ? { background: 'rgba(var(--blue-rgb), 0.15)', color: 'var(--blue)', border: '1px solid rgba(var(--blue-rgb), 0.4)' } : { background: 'var(--surface-deep)', color: 'var(--muted)', border: '1px solid var(--border)' }}>
-          <span className="inline-flex items-center gap-1.5">Registration{!session?.registration_enabled && <Lock size={11} />}</span>
+          <span className="inline-flex items-center gap-1.5">Registration (legacy){!session?.registration_enabled && <Lock size={11} />}</span>
         </button>
         <button onClick={() => session?.registration_enabled && setTab('registrants')}
           disabled={!session?.registration_enabled}
@@ -311,7 +320,16 @@ export default function ActivityRegistrationBuilder() {
         </button>
       </div>
 
-      {tab === 'registrants' && session?.registration_enabled ? (
+      {tab === 'flow' && session?.registration_enabled ? (
+        <div>
+          <div className="mb-5 p-4 rounded-xl text-sm" style={{ background: 'rgba(var(--blue-rgb), 0.05)', border: '1px solid rgba(var(--blue-rgb), 0.2)', color: 'var(--muted)' }}>
+            This is the public registration form for this event — a tree of forms with
+            branching, presets, and multi-step flows. It's what visitors see when they hit
+            "Register Now" on the event page. Add the first form below if you haven't yet.
+          </div>
+          <FormGraphBuilderForOwner ownerKind="activity" ownerId={sessionId} />
+        </div>
+      ) : tab === 'registrants' && session?.registration_enabled ? (
         <RegistrantsPanel sessionId={sessionId} />
       ) : tab === 'appearance' ? (
         <AppearancePanel sessionId={sessionId} session={session} onSaved={setSession} />
@@ -321,6 +339,11 @@ export default function ActivityRegistrationBuilder() {
         <UpdatesPanel sessionId={sessionId} />
       ) : tab === 'builder' && session?.registration_enabled ? (
       <>
+      <div className="mb-5 p-4 rounded-xl text-sm" style={{ background: 'rgba(var(--warning-rgb), 0.08)', border: '1px solid rgba(var(--warning-rgb), 0.3)', color: 'var(--muted)' }}>
+        <span style={{ color: 'var(--warning)', fontWeight: 700 }}>Legacy — no longer shown on the public event page.</span> The
+        {' '}<span style={{ color: 'var(--blue)' }}>Form Builder</span> tab is what visitors actually see now. This tab is kept
+        so you can view and edit past segment/category setups; changes here won't affect the live Register button.
+      </div>
       <div className="mb-5 p-4 rounded-xl text-sm" style={{ background: 'rgba(var(--blue-rgb), 0.05)', border: '1px solid rgba(var(--blue-rgb), 0.2)', color: 'var(--muted)' }}>
         Each <span style={{ color: 'var(--blue)' }}>segment</span> below is a top-level
         registration option for this event. They appear as cards on the public
@@ -450,6 +473,12 @@ function RegistrantsPanel({ sessionId }: { sessionId: string }) {
             style={{ background: 'rgba(var(--accent2-rgb), 0.1)', color: 'var(--accent2)', border: '1px solid rgba(var(--accent2-rgb), 0.25)' }}>
             <Upload size={12} style={{ transform: 'rotate(180deg)' }} /> Export CSV
           </button>
+          <a href={`/api/admin/activity-sessions/${sessionId}/registrations.csv`}
+            className="text-xs px-3 py-1.5 rounded-lg flex-shrink-0 flex items-center gap-1.5"
+            style={{ background: 'rgba(var(--cat-teal-rgb), 0.1)', color: 'var(--cat-teal)', border: '1px solid rgba(var(--cat-teal-rgb), 0.25)' }}
+            title="Server-built CSV with the full registration set, including the v2 form-graph path and team columns.">
+            <Download size={12} /> All rows CSV
+          </a>
         </div>
       </div>
 
@@ -643,7 +672,7 @@ function AppearancePanel({ sessionId, session, onSaved }: { sessionId: string; s
       <div className="rounded-xl p-4" style={{ background: 'var(--surface-deep)', border: '1px solid var(--border)' }}>
         <p className="text-xs font-bold mb-2" style={{ color: 'var(--muted)' }}>PREVIEW (what the public form will look like)</p>
         <div className="rounded-lg p-4" style={{ background: 'var(--bg2)', border: '1px solid var(--border)' }}>
-          <h3 className="text-lg font-black mb-1" style={{ fontFamily: previewFont !== 'inherit' ? previewFont : "'Orbitron', sans-serif", color: 'var(--white)' }}>{previewTitle || '(no title)'}</h3>
+          <h3 className="text-lg font-black mb-1" style={{ fontFamily: previewFont !== 'inherit' ? previewFont : 'inherit', color: 'var(--white)' }}>{previewTitle || '(no title)'}</h3>
           {previewCover && (
             <div className="rounded overflow-hidden mb-2" style={{ border: '1px solid var(--border)' }}>
               <img src={previewCover} alt="cover preview" className="w-full max-h-32 object-cover" />
@@ -726,7 +755,7 @@ function AppearancePanel({ sessionId, session, onSaved }: { sessionId: string; s
               </button>
             ))}
             <input type="color"
-              value={appearance?.form_bg_theme?.startsWith('#') ? appearance.form_bg_theme : '#3b82f6'}
+              value={appearance?.form_bg_theme?.startsWith('#') ? appearance.form_bg_theme : '#00d4ff'}
               onChange={e => patch('form_bg_theme', e.target.value)}
               className="w-9 h-9 rounded-full border-2 cursor-pointer"
               style={{ borderColor: appearance?.form_bg_theme?.startsWith('#') ? '#fff' : 'transparent', padding: 0, background: 'none' }}
@@ -1075,6 +1104,7 @@ function CategoryEditor({ category, isLeaf, onSave }: { category: Category; isLe
   const [registrationOpen, setRegistrationOpen] = useState(category.registration_open !== false)
   const [customFields, setCustomFields] = useState<CustomField[]>(category.custom_fields || [])
   const [requiresTeam, setRequiresTeam] = useState(category.requires_team)
+  const [teamOptional, setTeamOptional] = useState(category.team_optional || false)
   const [teamMin, setTeamMin] = useState(category.team_size_min?.toString() || '')
   const [teamMax, setTeamMax] = useState(category.team_size_max?.toString() || '')
   const [teamFields, setTeamFields] = useState<CustomField[]>(category.team_member_fields || [])
@@ -1127,6 +1157,7 @@ function CategoryEditor({ category, isLeaf, onSave }: { category: Category; isLe
       registration_open: registrationOpen,
       custom_fields: customFields,
       requires_team: requiresTeam,
+      team_optional: requiresTeam ? teamOptional : false,
       team_size_min: teamMin ? Number(teamMin) : null,
       team_size_max: teamMax ? Number(teamMax) : null,
       team_member_fields: teamFields,
@@ -1180,6 +1211,10 @@ function CategoryEditor({ category, isLeaf, onSave }: { category: Category; isLe
             </label>
             {requiresTeam && (
               <div className="space-y-3 pl-6">
+                <label className="flex items-center gap-2 text-xs" style={{ color: 'var(--muted)' }}>
+                  <input type="checkbox" checked={teamOptional} onChange={e => setTeamOptional(e.target.checked)} />
+                  Team is optional — registrants may also sign up alone
+                </label>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs mb-1" style={{ color: 'var(--muted)' }}>Min team size</label>
@@ -1467,6 +1502,7 @@ function SegmentEditor({ segment, onSave }: { segment: Category; onSave: (patch:
   const [registrationOpen, setRegistrationOpen] = useState(segment.registration_open !== false)
   const [formFieldSchema, setFormFieldSchema] = useState<FormBlock[]>(segment.form_field_schema || [])
   const [requiresTeam, setRequiresTeam] = useState(segment.requires_team)
+  const [teamOptional, setTeamOptional] = useState(segment.team_optional || false)
   const [teamMin, setTeamMin] = useState(segment.team_size_min?.toString() || '')
   const [teamMax, setTeamMax] = useState(segment.team_size_max?.toString() || '')
   const [teamFields, setTeamFields] = useState<CustomField[]>(segment.team_member_fields || [])
@@ -1510,6 +1546,7 @@ function SegmentEditor({ segment, onSave }: { segment: Category; onSave: (patch:
       registration_open: registrationOpen,
       form_field_schema: formFieldSchema,
       requires_team: requiresTeam,
+      team_optional: requiresTeam ? teamOptional : false,
       team_size_min: teamMin ? Number(teamMin) : null,
       team_size_max: teamMax ? Number(teamMax) : null,
       team_member_fields: teamFields,
