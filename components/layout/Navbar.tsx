@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { Menu, X, ChevronDown } from "lucide-react";
+import { Menu, X, ChevronDown, Search, Home, Info, Microscope, Newspaper, Users, Trophy, UserPlus } from "lucide-react";
 import { ActivityIcon } from "@/lib/activityIcons";
 
 type NavChild = { href: string; label: string; icon?: string };
@@ -24,6 +24,17 @@ const STATIC_NAV: NavItem[] = [
   { href: "/olympiad", label: "Olympiad" },
   { href: "/membership", label: "Membership" },
 ];
+
+/* Map each top-level nav item to a lucide icon used in the mobile drawer. */
+const NAV_ICON: Record<string, React.ReactNode> = {
+  "/": <Home size={16} />,
+  "/about": <Info size={16} />,
+  "Activities": <Microscope size={16} />,
+  "/publication": <Newspaper size={16} />,
+  "Executives": <Users size={16} />,
+  "/olympiad": <Trophy size={16} />,
+  "/membership": <UserPlus size={16} />,
+};
 
 const HIDE_NAVBAR_ON = ["/login", "/register", "/dashboard", "/admin"];
 
@@ -59,18 +70,18 @@ function AuthButton({ mobile = false }: { mobile?: boolean }) {
   if (mobile) {
     return loggedIn ? (
       <>
-        <Link href="/dashboard" className="mt-5 py-4 text-center font-black tracking-widest rounded-xl border text-sm" style={{ borderColor: "var(--blue)", color: "var(--blue)", fontFamily: "'Orbitron',sans-serif" }}>MY DASHBOARD</Link>
+        <Link href="/dashboard" className="mt-5 py-4 text-center font-black tracking-widest rounded-xl border text-sm" style={{ borderColor: "var(--blue)", color: "var(--blue)", fontFamily: 'inherit' }}>MY DASHBOARD</Link>
         <button onClick={handleLogout} className="py-3 text-sm text-center" style={{ color: "var(--muted)" }}>Sign Out</button>
       </>
     ) : (
-      <Link href="/login" className="mt-5 py-4 text-center font-black tracking-widest rounded-xl border text-sm" style={{ borderColor: "var(--blue)", color: "var(--blue)", fontFamily: "'Orbitron',sans-serif" }}>MEMBER LOGIN</Link>
+      <Link href="/login" className="mt-5 py-4 text-center font-black tracking-widest rounded-xl border text-sm" style={{ borderColor: "var(--blue)", color: "var(--blue)", fontFamily: 'inherit' }}>MEMBER LOGIN</Link>
     );
   }
 
   return loggedIn ? (
-    <Link href="/dashboard" className="px-4 py-2 text-xs font-black tracking-widest rounded-lg border transition-all duration-200 hover:bg-[var(--blue)] hover:text-black hover:border-[var(--blue)]" style={{ borderColor: "var(--blue)", color: "var(--blue)", fontFamily: "'Orbitron',sans-serif" }}>Dashboard</Link>
+    <Link href="/dashboard" className="px-4 py-2 text-xs font-black tracking-widest rounded-lg border transition-all duration-200 hover:bg-[var(--blue)] hover:text-black hover:border-[var(--blue)]" style={{ borderColor: "var(--blue)", color: "var(--blue)", fontFamily: 'inherit' }}>Dashboard</Link>
   ) : (
-    <Link href="/login" className="px-4 py-2 text-xs font-black tracking-widest rounded-lg border transition-all duration-200 hover:bg-[var(--blue)] hover:text-black hover:border-[var(--blue)]" style={{ borderColor: "var(--blue)", color: "var(--blue)", fontFamily: "'Orbitron',sans-serif" }}>Login</Link>
+    <Link href="/login" className="px-4 py-2 text-xs font-black tracking-widest rounded-lg border transition-all duration-200 hover:bg-[var(--blue)] hover:text-black hover:border-[var(--blue)]" style={{ borderColor: "var(--blue)", color: "var(--blue)", fontFamily: 'inherit' }}>Login</Link>
   );
 }
 
@@ -82,6 +93,87 @@ export default function Navbar() {
   const [openDesktop, setOpenDesktop] = useState<string | null>(null);
   const pathname = usePathname();
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const desktopWheelRef = useRef<HTMLSpanElement | null>(null);
+  const mobileWheelRef = useRef<HTMLSpanElement | null>(null);
+
+  // Drive the wheel from JS. The same animator that moves the wheel
+  // also writes the text visibility directly to the DOM, so motion
+  // and text stay in perfect sync without React re-renders.
+  useEffect(() => {
+    let raf = 0;
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    // ── Timing of one cycle, in seconds ──────────────────────────────
+    const CYCLE = 15;
+    const ROLL_DURATION = 2.4;
+    const PARK_DURATION = 1.0;
+    const IDLE_FRACTION = 0.30;
+    // idle = 4.5s, roll-out = 2.4s, park = 1.0s, roll-back = 2.4s, trailing idle = 4.7s
+
+    // Cubic ease-in-out — smooth acceleration, slight settle.
+    const easeInOut = (t: number) =>
+      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+    // Wait one frame so refs are populated after mount.
+    const start = performance.now();
+    let lastMoving: boolean | null = null;
+
+    const setMovingAttr = (el: HTMLElement | null, v: boolean) => {
+      if (!el) return;
+      if (el.dataset.moving !== String(v)) el.dataset.moving = String(v);
+    };
+    const setTransform = (el: HTMLElement | null, tx: number, rot: number) => {
+      if (!el) return;
+      el.style.transform = `translateX(${tx}px) rotate(${rot}deg)`;
+    };
+
+    const tick = (now: number) => {
+      const t = ((now - start) / 1000) % CYCLE;
+      const phase = t / CYCLE;
+
+      let tx = 0;
+      let rot = 0;
+      const rollFrac = ROLL_DURATION / CYCLE;
+      const parkFrac = PARK_DURATION / CYCLE;
+      const rollStart = IDLE_FRACTION;
+      const parkStart = rollStart + rollFrac;
+      const rollBackStart = parkStart + parkFrac;
+      const cycleEnd = rollBackStart + rollFrac;
+
+      if (phase >= rollStart && phase < parkStart) {
+        const k = (phase - rollStart) / rollFrac;
+        const e = easeInOut(k);
+        tx = 210 * e;
+        rot = 360 * e;
+      } else if (phase >= parkStart && phase < rollBackStart) {
+        tx = 210;
+        rot = 360;
+      } else if (phase >= rollBackStart && phase < cycleEnd) {
+        const k = (phase - rollBackStart) / rollFrac;
+        const e = easeInOut(k);
+        tx = 210 * (1 - e);
+        rot = 360 * (1 - e);
+      }
+
+      const moving = tx !== 0 || rot !== 0;
+      setTransform(desktopWheelRef.current, tx, rot);
+      setTransform(mobileWheelRef.current, tx, rot);
+      if (moving !== lastMoving) {
+        lastMoving = moving;
+        // Desktop text wrap is the parent of the desktop wheel's sibling.
+        // Find them via the ref's parentElement structure.
+        const dt = desktopWheelRef.current?.parentElement?.querySelector<HTMLElement>(".ndsc-logo-text-wrap");
+        const mt = mobileWheelRef.current?.parentElement?.querySelector<HTMLElement>(".t1-wrap");
+        setMovingAttr(dt, moving);
+        setMovingAttr(mt, moving);
+      }
+
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   useEffect(() => {
     fetch("/api/activity-types-public")
@@ -123,10 +215,10 @@ export default function Navbar() {
     <>
       <style>{`
         .navbar-glass {
-          background: rgba(2, 8, 16, 0.97);
-          backdrop-filter: blur(20px);
-          -webkit-backdrop-filter: blur(20px);
-          border-bottom: 1px solid rgba(0, 212, 255, 0.12);
+          background: rgba(2, 8, 16, 0.92);
+          backdrop-filter: blur(20px) saturate(180%);
+          -webkit-backdrop-filter: blur(20px) saturate(180%);
+          border-bottom: 1px solid rgba(var(--blue-rgb), 0.12);
         }
         .nav-link {
           position: relative;
@@ -154,41 +246,69 @@ export default function Navbar() {
         .nav-link.active { color: var(--blue); }
         .nav-link.active::after { width: 100%; }
 
+        /* Static, deliberate brand mark — replaces the old sliding-gradient
+           "shimmer" (3s linear infinite background-position) which read as
+           a 1999s web ring instead of a logo.
+
+           The text now uses a fixed cyan→deep-cyan gradient with stops
+           that read as one deliberate piece, not a moving bar. Hover
+           swaps it to a crisp solid color and adds a small scale. */
         .ndsc-logo-text {
-          background: linear-gradient(135deg, #00d4ff 0%, #0099cc 60%, #00d4ff 100%);
-          background-size: 200% auto;
+          background: linear-gradient(180deg, #e8f4ff 0%, var(--blue) 100%);
           -webkit-background-clip: text;
           background-clip: text;
           -webkit-text-fill-color: transparent;
-          animation: shimmerText 3s linear infinite;
+          transition: filter 0.3s ease;
         }
-        @keyframes shimmerText {
-          0% { background-position: 0% center; }
-          100% { background-position: 200% center; }
+
+        /* Logo motion is JS-driven (see useEffect in component). */
+        .ndsc-logo-mark {
+          display: inline-block;
+          transform-origin: 50% 50%;
+          will-change: transform;
+        }
+        .ndsc-logo-text-wrap {
+          overflow: hidden;
+          max-width: 220px;
+        }
+        .ndsc-logo-text-inner {
+          display: block;
+          opacity: 1;
+          transition: opacity 0.35s ease;
+        }
+        .ndsc-logo-text-wrap[data-moving="true"] .ndsc-logo-text-inner {
+          opacity: 0;
         }
         .ndsc-logo-glow {
-          filter: drop-shadow(0 0 8px rgba(0,212,255,0.5));
-          transition: filter 0.3s;
+          transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), filter 0.3s ease;
         }
         .ndsc-logo-glow:hover {
-          filter: drop-shadow(0 0 16px rgba(0,212,255,0.85));
+          transform: scale(1.03);
+          filter:
+            drop-shadow(0 0 10px rgba(var(--blue-rgb), 0.7))
+            drop-shadow(0 0 22px rgba(var(--blue-rgb), 0.25));
+        }
+        .ndsc-logo-glow:hover .ndsc-logo-text {
+          filter: brightness(1.15);
         }
       `}</style>
 
-      <header className="navbar-glass fixed top-0 left-0 w-full z-50 transition-all duration-300">
+      <header className="navbar-glass fixed top-0 left-0 w-full z-50 transition-[background,backdrop-filter,border-color] duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between" style={{ height: "var(--navbar-height, 64px)" }}>
 
           {/* LOGO */}
           <Link href="/" className="ndsc-logo-glow flex items-center gap-3 shrink-0 z-10 group">
-            <div className="relative" style={{ width: "var(--navbar-logo, 38px)", height: "var(--navbar-logo, 38px)" }}>
+            <span ref={desktopWheelRef} className="ndsc-logo-mark relative" style={{ width: "var(--navbar-logo, 38px)", height: "var(--navbar-logo, 38px)", display: "inline-block" }}>
               <Image src="/images/cropped-logo.png" alt="NDSC" fill className="object-contain" />
-            </div>
-            <div className="hidden sm:flex flex-col leading-none">
-              <span className="ndsc-logo-text text-sm font-black tracking-[0.2em]" style={{ fontFamily: "'Orbitron',sans-serif" }}>
-                NDSC
-              </span>
-              <span className="text-[9px] tracking-[0.18em] mt-0.5 font-medium" style={{ color: "rgba(0,212,255,0.55)", fontFamily: "'Share Tech Mono',monospace" }}>
-                Notre Dame Science Club
+            </span>
+            <div className="ndsc-logo-text-wrap hidden sm:flex flex-col leading-none">
+              <span className="ndsc-logo-text-inner">
+                <span className="ndsc-logo-text text-sm font-black tracking-[0.2em] block" style={{ fontFamily: 'inherit' }}>
+                  NDSC
+                </span>
+                <span className="text-[9px] tracking-[0.18em] mt-0.5 font-medium block" style={{ color: "rgba(var(--blue-rgb), 0.55)", fontFamily: "var(--font-mono)" }}>
+                  Notre Dame Science Club
+                </span>
               </span>
             </div>
           </Link>
@@ -213,12 +333,12 @@ export default function Navbar() {
                     zIndex: 50, minWidth: "210px",
                   }}>
                     <div className="rounded-xl border py-2" style={{
-                      background: "rgba(3,10,22,0.98)", borderColor: "rgba(0,212,255,0.2)",
-                      backdropFilter: "blur(24px)", boxShadow: "0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,212,255,0.05)",
+                      background: "rgba(3,10,22,0.98)", borderColor: "rgba(var(--blue-rgb), 0.2)",
+                      backdropFilter: "blur(24px)", boxShadow: "0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(var(--blue-rgb), 0.05)",
                     }}>
                       {item.children.map((c) => (
                         <Link key={c.href} href={c.href}
-                          className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium transition-all hover:text-[var(--blue)] hover:pl-5 hover:bg-[rgba(0,212,255,0.04)]"
+                          className="flex items-center gap-2.5 px-4 py-2.5 text-xs font-medium transition-all hover:text-[var(--blue)] hover:pl-5 hover:bg-[rgba(var(--blue-rgb), 0.04)]"
                           style={{ color: "var(--muted)" }}>
                           {c.icon ? (
                             <ActivityIcon icon={c.icon} size={14} className="shrink-0" style={{ color: "var(--blue)" }} />
@@ -255,68 +375,257 @@ export default function Navbar() {
         </div>
       </header>
 
-      {/* MOBILE MENU */}
-      <div className="fixed inset-0 z-40 lg:hidden flex flex-col transition-all duration-300"
-        style={{
-          background: "rgba(2,8,16,0.99)", backdropFilter: "blur(20px)",
-          opacity: mobileOpen ? 1 : 0, pointerEvents: mobileOpen ? "all" : "none",
-          transform: mobileOpen ? "translateX(0)" : "translateX(100%)",
-        }}>
-        <div className="flex items-center justify-between px-5 py-4 border-b shrink-0" style={{ borderColor: "var(--border)" }}>
-          <div className="flex items-center gap-3">
-            <Image src="/images/cropped-logo.png" alt="NDSC" width={32} height={32} />
+      {/* MOBILE DRAWER (slides in from the left, like the reference) */}
+      <style>{`
+        .mnav-backdrop {
+          position: fixed; inset: 0; z-index: 39; background: rgba(0, 0, 0, 0.55);
+          backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+          opacity: 0; pointer-events: none;
+          transition: opacity 0.3s ease;
+        }
+        .mnav-backdrop.open { opacity: 1; pointer-events: auto; }
+        .mnav-drawer {
+          position: fixed; top: 0; left: 0; bottom: 0; z-index: 40;
+          width: min(86vw, 360px);
+          display: flex; flex-direction: column;
+          background: linear-gradient(180deg, rgba(8, 39, 122, 0.96) 0%, rgba(6, 26, 58, 0.97) 100%);
+          backdrop-filter: blur(20px) saturate(150%);
+          -webkit-backdrop-filter: blur(20px) saturate(150%);
+          border-right: 1px solid rgba(var(--blue-rgb), 0.18);
+          box-shadow: 18px 0 50px rgba(0, 0, 0, 0.5);
+          transform: translateX(-100%);
+          transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+          will-change: transform;
+        }
+        .mnav-drawer.open { transform: translateX(0); }
+        .mnav-header {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 18px 18px 14px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+          flex-shrink: 0;
+        }
+        .mnav-brand { display: flex; align-items: center; gap: 10px; }
+        .mnav-brand .t1 {
+          font-family: var(--font-heading);
+          font-size: 14px; font-weight: 900; letter-spacing: 0.22em;
+          background: linear-gradient(180deg, #e8f4ff 0%, var(--blue) 100%);
+          -webkit-background-clip: text; background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+        .mnav-brand .t1-wrap {
+          display: block; overflow: hidden; vertical-align: middle;
+          max-width: 180px;
+        }
+        .mnav-brand .t1-inner {
+          display: block;
+          opacity: 1;
+          transition: opacity 0.35s ease;
+        }
+        .mnav-brand .t1-wrap[data-moving="true"] .t1-inner {
+          opacity: 0;
+        }
+        .mnav-brand .mark {
+          display: inline-block;
+          transform-origin: 50% 50%;
+          will-change: transform;
+        }
+        .mnav-brand .t2 {
+          font-family: var(--font-mono);
+          font-size: 9px; letter-spacing: 0.18em;
+          color: rgba(var(--blue-rgb), 0.55); margin-top: 2px;
+        }
+        .mnav-close {
+          width: 36px; height: 36px;
+          display: flex; align-items: center; justify-content: center;
+          border-radius: 10px;
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          color: #cbd5e1;
+          transition: background 0.2s, color 0.2s, transform 0.2s;
+          cursor: pointer;
+        }
+        .mnav-close:hover { background: rgba(var(--blue-rgb), 0.18); color: var(--blue); transform: rotate(90deg); }
+        .mnav-search {
+          padding: 14px 18px 10px;
+          flex-shrink: 0;
+        }
+        .mnav-search-box {
+          display: flex; align-items: center; gap: 8px;
+          padding: 10px 12px;
+          border-radius: 12px;
+          background: rgba(255, 255, 255, 0.06);
+          border: 1px solid rgba(255, 255, 255, 0.10);
+          color: #cbd5e1;
+        }
+        .mnav-search input {
+          flex: 1; min-width: 0; background: transparent; border: 0; outline: 0;
+          color: #fff; font-size: 13px; font-family: 'Poppins', sans-serif;
+        }
+        .mnav-search input::placeholder { color: rgba(203, 213, 225, 0.55); }
+        .mnav-list {
+          flex: 1; overflow-y: auto;
+          padding: 8px 12px 16px;
+          display: flex; flex-direction: column; gap: 4px;
+        }
+        .mnav-item {
+          position: relative;
+          display: flex; align-items: center; gap: 12px;
+          padding: 12px 14px;
+          border-radius: 12px;
+          color: #e2e8f0;
+          text-decoration: none;
+          font-size: 14px; font-weight: 600;
+          font-family: 'Poppins', sans-serif;
+          background: transparent;
+          border: 1px solid transparent;
+          transition: background 0.2s, color 0.2s, border-color 0.2s, transform 0.2s;
+          width: 100%; text-align: left;
+          cursor: pointer;
+        }
+        .mnav-item:hover {
+          background: rgba(var(--blue-rgb), 0.08);
+          border-color: rgba(var(--blue-rgb), 0.18);
+          color: #ffffff;
+        }
+        .mnav-item.active {
+          background: rgba(var(--blue-rgb), 0.12);
+          border-color: rgba(var(--blue-rgb), 0.32);
+          color: var(--blue);
+        }
+        .mnav-item .ico {
+          width: 32px; height: 32px; min-width: 32px;
+          display: flex; align-items: center; justify-content: center;
+          border-radius: 9px;
+          background: rgba(var(--blue-rgb), 0.10);
+          border: 1px solid rgba(var(--blue-rgb), 0.22);
+          color: var(--blue);
+        }
+        .mnav-item.active .ico {
+          background: rgba(var(--blue-rgb), 0.22);
+          border-color: rgba(var(--blue-rgb), 0.45);
+        }
+        .mnav-item .arrow { margin-left: auto; color: rgba(203, 213, 225, 0.6); transition: transform 0.2s; }
+        .mnav-item.open .arrow { transform: rotate(180deg); color: var(--blue); }
+        .mnav-sub {
+          display: flex; flex-direction: column; gap: 2px;
+          padding: 4px 4px 8px 56px;
+        }
+        .mnav-sub a {
+          display: flex; align-items: center; gap: 8px;
+          padding: 8px 10px;
+          border-radius: 8px;
+          color: #94a3b8;
+          text-decoration: none;
+          font-size: 13px; font-weight: 500;
+          transition: color 0.2s, background 0.2s;
+        }
+        .mnav-sub a:hover { color: var(--blue); background: rgba(var(--blue-rgb), 0.05); }
+        .mnav-auth {
+          padding: 12px 18px 22px;
+          flex-shrink: 0;
+          border-top: 1px solid rgba(255, 255, 255, 0.10);
+        }
+      `}</style>
+
+      {/* Backdrop */}
+      <div
+        className={`mnav-backdrop lg:hidden ${mobileOpen ? "open" : ""}`}
+        onClick={() => setMobileOpen(false)}
+        aria-hidden="true"
+      />
+
+      {/* Drawer */}
+      <aside
+        className={`mnav-drawer lg:hidden ${mobileOpen ? "open" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Mobile navigation"
+      >
+        <div className="mnav-header">
+          <Link href="/" className="mnav-brand" onClick={() => setMobileOpen(false)}>
+            <span ref={mobileWheelRef} className="mark" style={{ width: 32, height: 32, position: "relative", display: "inline-block" }}>
+              <Image src="/images/cropped-logo.png" alt="NDSC" fill className="object-contain" />
+            </span>
             <div className="flex flex-col">
-              <span className="text-sm font-black tracking-widest ndsc-logo-text" style={{ fontFamily: "'Orbitron',sans-serif" }}>NDSC</span>
-              <span className="text-[9px] tracking-wider" style={{ color: "rgba(0,212,255,0.5)", fontFamily: "'Share Tech Mono',monospace" }}>Notre Dame Science Club</span>
+              <span className="t1-wrap">
+                <span className="t1-inner">
+                  <span className="t1 block">NDSC</span>
+                  <span className="t2 block">Notre Dame Science Club</span>
+                </span>
+              </span>
             </div>
-          </div>
-          <button onClick={() => setMobileOpen(false)} className="p-1"><X size={22} style={{ color: "var(--muted)" }} /></button>
+          </Link>
+          <button suppressHydrationWarning className="mnav-close" onClick={() => setMobileOpen(false)} aria-label="Close menu">
+            <X size={18} />
+          </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-5 py-6 flex flex-col gap-1">
-          {nav.map((item) =>
-            item.children && item.children.length > 0 ? (
-              <div key={item.label}>
-                <button
-                  onClick={() => {
-                    if (item.label === "Activities") setActOpen(!actOpen);
-                    if (item.label === "Executives") setExecOpen(!execOpen);
-                  }}
-                  className="w-full flex items-center justify-between py-3 text-base font-bold border-b transition-colors"
-                  style={{ borderColor: "var(--border)", color: "var(--white)", fontFamily: "'Orbitron',sans-serif" }}>
-                  {item.label}
-                  <ChevronDown size={16} style={{
-                    color: "var(--muted)",
-                    transform: (item.label === "Activities" && actOpen) || (item.label === "Executives" && execOpen) ? "rotate(180deg)" : "",
-                    transition: "transform .2s",
-                  }} />
-                </button>
-                {((item.label === "Activities" && actOpen) || (item.label === "Executives" && execOpen)) && (
-                  <div className="pl-4 mt-1 mb-2 flex flex-col gap-1">
-                    {item.children.map((c) => (
-                      <Link key={c.href} href={c.href} className="flex items-center gap-2 py-2 text-sm transition-colors hover:text-[var(--blue)]" style={{ color: "var(--muted)" }}>
-                        {c.icon ? (
-                          <ActivityIcon icon={c.icon} size={14} className="shrink-0" style={{ color: "var(--blue)" }} />
-                        ) : (
-                          <span className="text-xs" style={{ color: "var(--blue)" }}>→</span>
-                        )}
-                        {c.label}
-                      </Link>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : item.href ? (
-              <Link key={item.href} href={item.href}
-                className="py-3 text-base font-bold border-b transition-colors hover:text-[var(--blue)]"
-                style={{ borderColor: "var(--border)", color: pathname === item.href ? "var(--blue)" : "var(--white)", fontFamily: "'Orbitron',sans-serif" }}>
-                {item.label}
-              </Link>
-            ) : null
-          )}
-          <AuthButton mobile />
+        <div className="mnav-search">
+          <div className="mnav-search-box">
+            <Search size={15} style={{ color: "rgba(var(--blue-rgb), 0.7)" }} />
+            <input suppressHydrationWarning type="text" placeholder="Search the site…" disabled />
+          </div>
+        </div>
+
+        <nav className="mnav-list">
+          {nav.map((item) => {
+            if (item.children && item.children.length > 0) {
+              const isOpen = (item.label === "Activities" && actOpen) || (item.label === "Executives" && execOpen);
+              const icon = NAV_ICON[item.label] ?? <ChevronDown size={16} />;
+              return (
+                <div key={item.label}>
+                  <button
+                    suppressHydrationWarning
+                    className={`mnav-item ${isOpen ? "open" : ""}`}
+                    onClick={() => {
+                      if (item.label === "Activities") setActOpen(!actOpen);
+                      if (item.label === "Executives") setExecOpen(!execOpen);
+                    }}
+                  >
+                    <span className="ico">{icon}</span>
+                    <span>{item.label}</span>
+                    <ChevronDown size={14} className="arrow" />
+                  </button>
+                  {isOpen && (
+                    <div className="mnav-sub">
+                      {item.children.map((c) => (
+                        <Link key={c.href} href={c.href} onClick={() => setMobileOpen(false)}>
+                          {c.icon ? (
+                            <ActivityIcon icon={c.icon} size={14} className="shrink-0" style={{ color: "var(--blue)" }} />
+                          ) : (
+                            <span style={{ width: 6, height: 6, borderRadius: 3, background: "var(--blue)", display: "inline-block" }} />
+                          )}
+                          {c.label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            if (item.href) {
+              const active = pathname === item.href;
+              const icon = NAV_ICON[item.href] ?? <ChevronDown size={16} />;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={`mnav-item ${active ? "active" : ""}`}
+                >
+                  <span className="ico">{icon}</span>
+                  <span>{item.label}</span>
+                </Link>
+              );
+            }
+            return null;
+          })}
         </nav>
-      </div>
+
+        <div className="mnav-auth">
+          <AuthButton mobile />
+        </div>
+      </aside>
     </>
   );
 }

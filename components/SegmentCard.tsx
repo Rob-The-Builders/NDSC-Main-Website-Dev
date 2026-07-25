@@ -24,6 +24,7 @@ type Segment = {
   schedule_time: string | null
   schedule_room: string | null
   requires_team: boolean
+  team_optional?: boolean
   requires_payment: boolean
   payment_amount: number | null
   payment_label: string | null
@@ -125,7 +126,7 @@ export default function SegmentCard({
         {/* Badges */}
         <div className="flex flex-wrap gap-1.5 mt-3">
           {segment.requires_team && (
-            <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: 'rgba(var(--accent2-rgb), 0.12)', color: 'var(--accent2)' }}>Team</span>
+            <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: 'rgba(var(--accent2-rgb), 0.12)', color: 'var(--accent2)' }}>{segment.team_optional ? 'Team (optional)' : 'Team'}</span>
           )}
           {segment.requires_payment && (
             <span className="text-[10px] uppercase tracking-wide px-2 py-0.5 rounded-full" style={{ background: 'rgba(var(--warning-rgb), 0.12)', color: 'var(--warning)' }}>৳{segment.payment_amount}</span>
@@ -145,10 +146,10 @@ export default function SegmentCard({
             className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-bold transition-all hover:-translate-y-0.5"
             style={
               isEnrolledInThis
-                ? { background: 'rgba(var(--blue-rgb), 0.15)', color: 'var(--blue)', border: '1px solid rgba(var(--blue-rgb), 0.4)', fontFamily: "'Orbitron', sans-serif" }
+                ? { background: 'rgba(var(--blue-rgb), 0.15)', color: 'var(--blue)', border: '1px solid rgba(var(--blue-rgb), 0.4)', fontFamily: 'inherit' }
                 : isEnrolledInAnother
-                ? { background: 'rgba(var(--cat-teal-rgb), 0.12)', color: 'var(--cat-teal)', border: '1px solid rgba(var(--cat-teal-rgb), 0.4)', fontFamily: "'Orbitron', sans-serif" }
-                : { background: 'var(--blue)', color: '#000', fontFamily: "'Orbitron', sans-serif" }
+                ? { background: 'rgba(var(--cat-teal-rgb), 0.12)', color: 'var(--cat-teal)', border: '1px solid rgba(var(--cat-teal-rgb), 0.4)', fontFamily: 'inherit' }
+                : { background: 'var(--blue)', color: '#000', fontFamily: 'inherit' }
             }
           >
             {isEnrolledInThis && <CheckCircle2 size={14} />}
